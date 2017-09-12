@@ -1,6 +1,6 @@
 * Description
-The `grep-notes' command provides a quick & easy way to view notes associated
-with the current context. The `grep-notes-file-assoc' option is used to specify
+The *grep-notes* command provides a quick & easy way to view notes associated
+with the current context. The *grep-notes-file-assoc* option is used to specify
 which file to use for grepping based on the current major-mode or some other
 condition.
 * Installation
