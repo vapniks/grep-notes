@@ -118,17 +118,33 @@ OPTIONS is a string containing extra options for grep."
 					  (regexp :tag "End regexp"))
 				  (string :tag "Extra grep options"))))
 
-(defcustom grep-notes-invisibility-spec '(other)
+(defcustom grep-notes-invisibility-spec '(t . (other))
   "Indicate which parts of the *grep* buffer to hide by default.
-This option will be used to set `buffer-invisibility-spec'.
-It should be a list containing some/all of the symbols 'other 'path &/or 'linum.
+The car and cdr of this cons cell will be used to set `buffer-invisibility-spec' into 
+one of two different states with `grep-notes-toggle-invisibility'.
+The car and cdr should be lists containing some/all of the symbols 'other 'path &/or 'linum.
 The 'other symbol will hide matches that are outside the region specified
 by startline & endline in the call to `grep-notes', the 'paths symbol hides
 filepaths at the beginning of each match, and 'linum hides line numbers."
   :group 'grep
-  :type '(set (const :tag "Hide irrelevant matches" other)
-	      (const :tag "Hide file paths" path)
-	      (const :tag "Hide line numbers" linum)))
+  :type '(cons (set (const :tag "Hide irrelevant matches" other)
+		    (const :tag "Hide file paths" path)
+		    (const :tag "Hide line numbers" linum))
+	       (set (const :tag "Hide irrelevant matches" other)
+		    (const :tag "Hide file paths" path)
+		    (const :tag "Hide line numbers" linum))))
+
+;;;###autoload
+(defun grep-notes-toggle-invisibility nil
+  "Toggle which parts of the *grep* buffer are invisible.
+Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisibility-spec'."
+  (interactive)
+  (setq buffer-invisibility-spec
+	(if (equal buffer-invisibility-spec
+		   (car grep-notes-invisibility-spec))
+	    (cdr grep-notes-invisibility-spec)
+	  (car grep-notes-invisibility-spec)))
+  (redraw-frame))
 
 ;;;###autoload
 (defun grep-notes (regex file &optional startline endline options)
@@ -199,7 +215,8 @@ OPTIONS is a string containing extra options for grep."
 		       (if start (setq start nil))))
 	      (forward-line 1)))
 	  (if start (add-text-properties start (point-max) '(invisible other))))))
-    (setq buffer-invisibility-spec grep-notes-invisibility-spec)))
+    (setq buffer-invisibility-spec (car grep-notes-invisibility-spec))
+    (local-set-key "t" 'grep-notes-toggle-invisibility)))
 
 (provide 'grep-notes)
 
