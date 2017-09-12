@@ -118,6 +118,18 @@ OPTIONS is a string containing extra options for grep."
 					  (regexp :tag "End regexp"))
 				  (string :tag "Extra grep options"))))
 
+(defcustom grep-notes-invisibility-spec '(other)
+  "Indicate which parts of the *grep* buffer to hide by default.
+This option will be used to set `buffer-invisibility-spec'.
+It should be a list containing some/all of the symbols 'other 'path &/or 'linum.
+The 'other symbol will hide matches that are outside the region specified
+by startline & endline in the call to `grep-notes', the 'paths symbol hides
+filepaths at the beginning of each match, and 'linum hides line numbers."
+  :group 'grep
+  :type '(set (const :tag "Hide irrelevant matches" other)
+	      (const :tag "Hide file paths" path)
+	      (const :tag "Hide line numbers" linum)))
+
 ;;;###autoload
 (defun grep-notes (regex file &optional startline endline options)
   "Grep for matches to REGEX between STARTLINE and ENDLINE in FILE.
@@ -176,12 +188,18 @@ OPTIONS is a string containing extra options for grep."
 		    ((> linum endline)
 		     (forward-line 0)
 		     (unless start (setq start (point))))
-		    (t (add-text-properties (or start (line-beginning-position))
+		    (t (if start (add-text-properties start (line-beginning-position)
+						      '(invisible other)))
+		       (add-text-properties (line-beginning-position)
 					    (- (point) (length (match-string 1)))
-					    '(invisible t))
+					    '(invisible path))
+		       (add-text-properties (- (point) (length (match-string 1)))
+					    (1+ (point))
+					    '(invisible linum))
 		       (if start (setq start nil))))
 	      (forward-line 1)))
-	  (if start (kill-region start (point-max))))))))
+	  (if start (add-text-properties start (point-max) '(invisible other))))))
+    (setq buffer-invisibility-spec grep-notes-invisibility-spec)))
 
 (provide 'grep-notes)
 
