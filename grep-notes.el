@@ -105,7 +105,7 @@ the current buffer in `grep-notes-file-assoc'"
   "Assoc list of the form (COND . (FILE START END OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
 in buffers of the required type. FILE is the file to be grepped. 
-START and END are either line numbers or strings matching start and end positions
+START and END are either line numbers or regexps matching start and end positions
 of the region to grep, or nil (in which case `point-min'/`point-max' will be used).
 OPTIONS is a string containing extra options for grep."
   :group 'grep
@@ -113,9 +113,9 @@ OPTIONS is a string containing extra options for grep."
 				  (sexp :tag "sexp"))
 		:value-type (list (file :must-match t)
 				  (choice (integer :tag "Start line number")
-					  (string :tag "Start string"))
+					  (regexp :tag "Start regexp"))
 				  (choice (integer :tag "Eng line number")
-					  (string :tag "End string"))
+					  (regexp :tag "End regexp"))
 				  (string :tag "Extra grep options"))))
 
 ;;;###autoload
@@ -128,10 +128,9 @@ If called with a prefix arg then FILE and OPTIONS will be prompted for.
 
 The whole file will be searched, but matches outside of the regions 
 delimited by STARTLINE and ENDLINE will be removed from the results.
-STARTLINE and ENDLINE can be either line numbers or strings in the file
-indicating the start and end positions of the region to search in.
-If either of STARTLINE or ENDLINE is nil then the start/end of the file
-will be used respectively.
+STARTLINE and ENDLINE can be either line numbers or regexps matching start 
+and end positions of the region to search in. If either of STARTLINE or ENDLINE 
+is nil then the start/end of the file will be used respectively.
 OPTIONS is a string containing extra options for grep."
   (interactive (let* ((lst (cl-assoc-if (lambda (val) (if (symbolp val)
 							  (eq major-mode val)
@@ -151,13 +150,13 @@ OPTIONS is a string containing extra options for grep."
 			  ((null startline) (point-min))
 			  ((stringp startline)
 			   (goto-char (point-min))
-			   (line-number-at-pos (or (search-forward startline nil t)
+			   (line-number-at-pos (or (re-search-forward startline nil t)
 						   (point-min)))))
 	  endline (cond ((numberp endline) endline)
 			((null endline) (point-max))
 			((stringp endline)
 			 (goto-line (point-max))
-			 (line-number-at-pos (or (search-backward endline nil t)
+			 (line-number-at-pos (or (re-search-backward endline nil t)
 						 (point-max)))))))
   (grep (concat "grep --color -nH " options " -e '" regex "' '" (expand-file-name file) "'"))
   (with-current-buffer "*grep*"
