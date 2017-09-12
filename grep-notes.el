@@ -155,7 +155,7 @@ OPTIONS is a string containing extra options for grep."
 	  endline (cond ((numberp endline) endline)
 			((null endline) (point-max))
 			((stringp endline)
-			 (goto-line startline)
+			 (goto-line (1+ startline))
 			 (line-number-at-pos (or (re-search-forward endline nil t)
 						 (point-max)))))))
   (grep (concat "grep --color -nH " options " -e '" regex "' '" (expand-file-name file) "'"))
