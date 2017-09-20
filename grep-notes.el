@@ -96,11 +96,11 @@
 
 
 (defcustom grep-notes-default-file nil
-  "Default file to use for `grep-notes' command when there is no file associated with 
-the current buffer in `grep-notes-file-assoc'. If nil then `grep-notes' will prompt
-for the file. If a directory then `grep-notes' will prompt for a file within that directory."
+  "Default file to use for `grep-notes' command.
+If nil then `grep-notes' will prompt for the file.
+If a directory then `grep-notes' will prompt for a file within that directory."
   :group 'grep
-  :type 'string)
+  :type 'file)
 
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE START END OPTIONS)) for use with `grep-notes' command.
