@@ -98,7 +98,7 @@
 (defcustom grep-notes-default-file nil
   "Default file to use for `grep-notes' command when there is no file associated with 
 the current buffer in `grep-notes-file-assoc'. If nil then `grep-notes' will prompt
-for the file."
+for the file. If a directory then `grep-notes' will prompt for a file within that directory."
   :group 'grep
   :type 'string)
 
@@ -175,6 +175,8 @@ OPTIONS is a string containing extra options for grep."
 		  (unless current-prefix-arg (third lst))
 		  (unless current-prefix-arg (fourth lst))
 		  (if current-prefix-arg (read-string "Extra options for grep: ") (fifth lst)))))
+  (if (file-directory-p file)
+      (setq file (read-file-name "File to grep: " file)))
   (with-current-buffer (find-file-noselect file t)
     (setq startline (cond ((numberp startline) startline)
 			  ((null startline) (point-min))
