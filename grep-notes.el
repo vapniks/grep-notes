@@ -115,7 +115,7 @@ OPTIONS is a string containing extra options for grep."
 		:value-type (list (file :must-match t)
 				  (choice (integer :tag "Start line number")
 					  (regexp :tag "Start regexp"))
-				  (choice (integer :tag "Eng line number")
+				  (choice (integer :tag "End line number")
 					  (regexp :tag "End regexp"))
 				  (string :tag "Extra grep options"))))
 
