@@ -128,12 +128,14 @@ The 'other symbol will hide matches that are outside the region specified
 by startline & endline in the call to `grep-notes', the 'paths symbol hides
 filepaths at the beginning of each match, and 'linum hides line numbers."
   :group 'grep
-  :type '(cons (set (const :tag "Hide irrelevant matches" other)
-		    (const :tag "Hide file paths" path)
-		    (const :tag "Hide line numbers" linum))
-	       (set (const :tag "Hide irrelevant matches" other)
-		    (const :tag "Hide file paths" path)
-		    (const :tag "Hide line numbers" linum))))
+  :type '(cons (choice (const :tag "Hide all" t)
+		       (set (const :tag "Hide irrelevant matches" other)
+			    (const :tag "Hide file paths" path)
+			    (const :tag "Hide line numbers" linum)))
+	       (choice (const :tag "Hide all" t)
+		       (set (const :tag "Hide irrelevant matches" other)
+			    (const :tag "Hide file paths" path)
+			    (const :tag "Hide line numbers" linum)))))
 
 ;;;###autoload
 (defun grep-notes-toggle-invisibility nil
