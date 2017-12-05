@@ -102,7 +102,7 @@ If a directory then `grep-notes' will prompt for a file within that directory."
   :group 'grep
   :type 'file)
 
-(defcustom grep-notes-default-options "-i -C 2"
+(defcustom grep-notes-default-options "-i"
   "Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
 Useful options could be -i (case-insensitive search), and -C <N> (include <N> lines of context)."
   :group 'grep
