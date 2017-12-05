@@ -111,18 +111,23 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE START END OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
-in buffers of the required type. FILE is the file to be grepped. 
+in buffers of the required type. FILE is the file to be grepped, or a directory containing
+files that the user can choose from when `grep-notes' is used interactively.
 START and END are either line numbers or regexps matching start and end positions
 of the region to grep, or nil (in which case `point-min'/`point-max' will be used).
 OPTIONS is a string containing extra options for grep."
   :group 'grep
-  :type '(alist :key-type (choice (symbol :tag "Major-mode")
-				  (sexp :tag "sexp"))
-		:value-type (list (file :must-match t)
-				  (choice (integer :tag "Start line number")
-					  (regexp :tag "Start regexp"))
-				  (choice (integer :tag "End line number")
-					  (regexp :tag "End regexp"))
+  :type '(alist :key-type (choice :tag "   Condition       "
+				  (symbol :tag "Major-mode")
+				  (sexp :tag "S-expression"))
+		:value-type (list :tag "Search options  "
+				  (file :must-match t)
+				  (repeat :tag "Search within following regions"
+					  (cons :tag "Region"
+						(choice (integer :tag "Start line number")
+							(regexp :tag "Start regexp"))
+						(choice (integer :tag "End line number  ")
+							(regexp :tag "End regexp  "))))
 				  (string :tag "Extra grep options"))))
 
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -156,18 +161,22 @@ Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisi
   (redraw-frame))
 
 ;;;###autoload
-(defun grep-notes (regex file &optional startline endline options)
-  "Grep for matches to REGEX between STARTLINE and ENDLINE in FILE.
+(defun grep-notes (regex file &optional options regions)
+  "Grep for matches to REGEX within REGIONS of FILE.
 
 When called interactively REGEX will be prompted for and all other args
 will be obtained from `grep-notes-file-assoc' or `grep-notes-default-file'. 
 If called with a prefix arg then FILE and OPTIONS will be prompted for.
 
 The whole file will be searched, but matches outside of the regions 
-delimited by STARTLINE and ENDLINE will be removed from the results.
-STARTLINE and ENDLINE can be either line numbers or regexps matching start 
-and end positions of the region to search in. If either of STARTLINE or ENDLINE 
-is nil then the start/end of the file will be used respectively.
+delimited by pairs of regexps or line numbers in regions will be removed from 
+the results. REGIONS is a list of pairs of either line numbers or regexps 
+matching start and end positions of the regions to search, in order.
+The pairs in REGIONS are processed sequentially so they should be in order.
+If the first region has nil for its start entry it is taken to mean the start 
+of the file, and if the last region has nil for its end entry it is taken to 
+mean the end of the file.
+
 OPTIONS is a string containing extra options for grep."
   (interactive (let* ((lst (cl-assoc-if (lambda (val) (if (symbolp val)
 							  (eq major-mode val)
@@ -180,55 +189,61 @@ OPTIONS is a string containing extra options for grep."
 		  (if current-prefix-arg (read-file-name "File to grep: ")
 		    (or (second lst) grep-notes-default-file
 			(read-file-name "File to grep: ")))
-		  (unless current-prefix-arg (third lst))
-		  (unless current-prefix-arg (fourth lst))
-		  (if current-prefix-arg (read-string "Extra options for grep: ") (fifth lst)))))
+		  (if current-prefix-arg (read-string "Extra options for grep: ") (fourth lst))
+		  (unless current-prefix-arg (third lst)))))
   (if (file-directory-p file)
       (setq file (read-file-name "File to grep: " file)))
   (with-current-buffer (find-file-noselect file t)
-    (setq startline (cond ((numberp startline) startline)
-			  ((null startline) (point-min))
-			  ((stringp startline)
-			   (goto-char (point-min))
-			   (line-number-at-pos (or (re-search-forward startline nil t)
-						   (point-min)))))
-	  endline (cond ((numberp endline) endline)
-			((null endline) (point-max))
-			((stringp endline)
-			 (goto-char (point-min))
-			 (forward-line startline)
-			 (line-number-at-pos (or (re-search-forward endline nil t)
-						 (point-max)))))))
-  (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
+    (goto-char (point-min))
+    (setq regions (cl-loop for (start . end) in regions
+			   for startline = (cond ((numberp start) start)
+						 ((null start) (point-min))
+						 ((stringp start)
+						  (line-number-at-pos (or (re-search-forward start nil t)
+									  (point-min)))))
+			   for endline = (cond ((numberp end) end)
+					       ((null end) (point-max))
+					       ((stringp end)
+						(line-number-at-pos (or (re-search-forward end nil t)
+									(point-max)))))
+			   collect (cons startline endline))))
+  (grep (concat "grep --color -nH "
+		(if (equal options "") grep-notes-default-options options)
 		" -e '" regex "' '" (expand-file-name file) "'"))
   (with-current-buffer "*grep*"
     (while (get-buffer-process "*grep*")
       (sleep-for 0.3))
     (let ((inhibit-read-only t)
 	  (rx (concat (regexp-quote (file-name-nondirectory file)) ":\\([0-9]+\\)"))
-	  start end)
+	  (region (pop regions))
+	  hidestart)
       (save-excursion
 	(goto-char (point-min))	  
 	(save-match-data
 	  (while (re-search-forward rx nil t)
-	    (let ((linum (string-to-number (match-string 1))))
-	      (cond ((< linum startline)
+	    (let ((linum (string-to-number (match-string 1)))
+		  (regionstart (car region))
+		  (regionend (cdr region)))
+	      (cond ((< linum regionstart)
 		     (forward-line 0) 
-		     (unless start (setq start (point))))
-		    ((> linum endline)
+		     (unless hidestart (setq hidestart (point))))
+		    ((> linum regionend)
 		     (forward-line 0)
-		     (unless start (setq start (point))))
-		    (t (if start (add-text-properties start (line-beginning-position)
-						      '(invisible other)))
-		       (add-text-properties (line-beginning-position)
-					    (- (point) (length (match-string 1)))
-					    '(invisible path))
-		       (add-text-properties (- (point) (length (match-string 1)))
-					    (1+ (point))
-					    '(invisible linum))
-		       (if start (setq start nil))))
+		     (unless hidestart (setq hidestart (point)))
+		     (if (> 0 (length regions))
+			 (setq region (pop regions))))
+		    (t (if hidestart (add-text-properties
+				      hidestart (line-beginning-position)
+				      '(invisible other)))
+		       (add-text-properties
+			(line-beginning-position) (- (point) (length (match-string 1)))
+			'(invisible path))
+		       (add-text-properties
+			(- (point) (length (match-string 1))) (1+ (point))
+			'(invisible linum))
+		       (if hidestart (setq hidestart nil))))
 	      (forward-line 1)))
-	  (if start (add-text-properties start (point-max) '(invisible other))))))
+	  (if hidestart (add-text-properties hidestart (point-max) '(invisible other))))))
     (setq buffer-invisibility-spec (car grep-notes-invisibility-spec))
     (local-set-key "t" 'grep-notes-toggle-invisibility)))
 
