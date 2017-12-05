@@ -102,6 +102,12 @@ If a directory then `grep-notes' will prompt for a file within that directory."
   :group 'grep
   :type 'file)
 
+(defcustom grep-notes-default-options "-i -C 2"
+  "Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
+Useful options could be -i (case-insensitive search), and -C <N> (include <N> lines of context)."
+  :group 'grep
+  :type 'string)
+
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE START END OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
@@ -193,7 +199,8 @@ OPTIONS is a string containing extra options for grep."
 			 (forward-line startline)
 			 (line-number-at-pos (or (re-search-forward endline nil t)
 						 (point-max)))))))
-  (grep (concat "grep --color -nH " options " -e '" regex "' '" (expand-file-name file) "'"))
+  (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
+		" -e '" regex "' '" (expand-file-name file) "'"))
   (with-current-buffer "*grep*"
     (while (get-buffer-process "*grep*")
       (sleep-for 0.3))
