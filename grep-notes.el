@@ -230,7 +230,7 @@ OPTIONS is a string containing extra options for grep."
 		    ((> linum regionend)
 		     (forward-line 0)
 		     (unless hidestart (setq hidestart (point)))
-		     (if (> 0 (length regions))
+		     (if (> (length regions) 0)
 			 (setq region (pop regions))))
 		    (t (if hidestart (add-text-properties
 				      hidestart (line-beginning-position)
