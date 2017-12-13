@@ -220,7 +220,7 @@ OPTIONS is a string containing extra options for grep."
       (save-excursion
 	(goto-char (point-min))	  
 	(save-match-data
-	  (while (re-search-forward rx nil t)
+	  (while (and region (re-search-forward rx nil t))
 	    (let ((linum (string-to-number (match-string 1)))
 		  (regionstart (car region))
 		  (regionend (cdr region)))
