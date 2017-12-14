@@ -162,6 +162,15 @@ Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisi
 	  (car grep-notes-invisibility-spec)))
   (redraw-frame))
 
+(defun grep-notes-propertize-line (pos offset)
+  "Add inivisble 'path & 'linum props to current line in *grep* buffer.
+POS is position of end of line number, OFFSET is length of line number."
+  (add-text-properties (line-beginning-position)
+		       (- pos (length offset))
+		       '(invisible path))
+  (add-text-properties (- pos (length offset)) (1+ pos)
+		       '(invisible linum)))
+
 (defun grep-notes-add-props-to-grep (file regions pos)
   "Add invisibility props to lines of *grep* buffer matching FILE.
 REGIONS is a list of cons cells defining regions to be left unhidden,
@@ -176,12 +185,7 @@ If REGIONS is nil, all lines will be left unhidden."
 	(goto-char pos)
 	(if (not region)
 	    (while (re-search-forward rx nil t)
-	      ;; Add invisible properties to the filepath and line number
-	      (add-text-properties (line-beginning-position)
-				   (- (point) (length (match-string 1)))
-				   '(invisible path))
-	      (add-text-properties (- (point) (length (match-string 1))) (1+ (point))
-				   '(invisible linum))
+	      (grep-notes-propertize-line (point) (match-string 1))
 	      (forward-line 1))
 	  (save-match-data
 	    (while (and region (re-search-forward rx nil t))
@@ -198,13 +202,7 @@ If REGIONS is nil, all lines will be left unhidden."
 		      (t (if hidestart ;if this is the first matching line of the region, hide previous lines
 			     (add-text-properties hidestart (line-beginning-position)
 						  '(invisible other)))
-			 ;; Add invisible properties to the filepath and line number
-			 (add-text-properties (line-beginning-position)
-					      (- (point) (length (match-string 1)))
-					      '(invisible path))
-			 (add-text-properties (- (point) (length (match-string 1)))
-					      (1+ (point))
-					      '(invisible linum))
+			 (grep-notes-propertize-line (point) (match-string 1))
 			 ;; indicate that we are in a region
 			 (if hidestart (setq hidestart nil))))
 		(forward-line 1)))
