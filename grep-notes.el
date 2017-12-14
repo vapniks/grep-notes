@@ -192,20 +192,20 @@ If REGIONS is nil, all lines will be left unhidden."
 	      (let ((linum (string-to-number (match-string 1)))
 		    (regionstart (car region))
 		    (regionend (cdr region)))
-		(cond ((< linum regionstart) nil)
+		(cond ((< linum regionstart)
+		       (forward-line 1))
 		      ((> linum regionend)
+		       (forward-line 0)
 		       (unless hidestart ;indicate that we have left a region
-			 (forward-line 0)
 			 (setq hidestart (point)))
 		       (if (> (length regions) 0)
 			   (setq region (pop regions))))
-		      (t (if hidestart ;if this is the first matching line of the region, hide previous lines
-			     (add-text-properties hidestart (line-beginning-position)
-						  '(invisible other)))
+		      (t (unless (not hidestart) ;if this is the first matching line of the region, hide previous lines
+			   (add-text-properties hidestart (line-beginning-position)
+						'(invisible other))
+			   (setq hidestart nil)) ;indicate that we are in a region
 			 (grep-notes-propertize-line (point) (match-string 1))
-			 ;; indicate that we are in a region
-			 (if hidestart (setq hidestart nil))))
-		(forward-line 1)))
+			 (forward-line 1)))))
 	    (if hidestart (add-text-properties hidestart
 					       (point) '(invisible other)))))
 	(point)))))
@@ -254,28 +254,28 @@ or by evaluating the car) will be used, but only the grep options from the first
 	   with pos = 1
 	   do (with-current-buffer (find-file-noselect file t)
 		(goto-char (point-min))
-		(setq regions (cl-loop for region in regions
-				       for start = (if (stringp region)
-						       (concat "^\\(\\*+\\) +" (regexp-quote region))
-						     (car region))
-				       for end = (if (stringp region) 'org-header (cdr region))
-				       for startline = (or (cond
-							    ((numberp start) start)
-							    ((stringp start)
-							     (line-number-at-pos (re-search-forward start nil t))))
-							   (point-min))
-				       for endline = (or (cond ((numberp end) end)
-							       ((stringp end)
-								(line-number-at-pos (re-search-forward end nil t)))
-							       ((eq end 'org-header)
-								(line-number-at-pos
-								 (if (match-string 1)
-								     (re-search-forward
-								      (concat "^" (regexp-quote (match-string 1)) " ")
-								      nil t)))))
-							 (point-max))
-				       collect (cons startline endline))))
-	   do (setq pos (grep-notes-add-props-to-grep file regions pos)))
+		(setq regions (cl-loop
+			       for region in regions
+			       for start = (if (stringp region)
+					       (concat "^\\(\\*+\\) +" (regexp-quote region))
+					     (car region))
+			       for end = (if (stringp region) 'org-header (cdr region))
+			       for startline = (or (cond
+						    ((numberp start) start)
+						    ((stringp start)
+						     (line-number-at-pos (re-search-forward start))))
+						   (point-min))
+			       for endline = (or (cond ((numberp end) end)
+						       ((stringp end)
+							(line-number-at-pos (re-search-forward end nil t)))
+						       ((eq end 'org-header)
+							(org-forward-heading-same-level 1)
+							(if (eq (line-number-at-pos) startline)
+							    (org-next-visible-heading 1))
+							(line-number-at-pos)))
+						 (point-max))
+			       collect (cons startline endline))))
+	   do (setq pos (grep-notes-add-props-to-grep file (cl-remove-if 'null regions) pos)))
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
