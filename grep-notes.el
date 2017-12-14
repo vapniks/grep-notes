@@ -109,12 +109,19 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
   :type 'string)
 
 (defcustom grep-notes-file-assoc nil
-  "Assoc list of the form (COND . (FILE START END OPTIONS)) for use with `grep-notes' command.
+  "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
-in buffers of the required type. FILE is the file to be grepped, or a directory containing
-files that the user can choose from when `grep-notes' is used interactively.
-START and END are either line numbers or regexps matching start and end positions
-of the region to grep, or nil (in which case `point-min'/`point-max' will be used).
+in buffers of the required type. FILE is the file to be grepped, or a glob pattern for
+matching multiple files (but in this case REGIONS will not be respected).
+REGIONS is a list of region specifications, each of which can take one of the following
+forms:
+ 1) the name of an org header (without the initial stars or whitespace)
+ 2) a cons cell of regexps matching the start and end of the region
+ 3) a cons cell of start and end line numbers for the region
+ 4) a function which takes the current major-mode as argument and returns one of the 
+    aforementioned types. For example if the function is `symbol-name' then the associated
+    regions will be org-headers named by the major-mode.
+If REGIONS is empty then the whole file will be used.
 OPTIONS is a string containing extra options for grep."
   :group 'grep
   :type '(alist :key-type (choice :tag "   Condition       "
@@ -129,7 +136,8 @@ OPTIONS is a string containing extra options for grep."
 							(regexp :tag "End regexp  "))
 						  (cons :tag "Line numbers"
 							(integer :tag "Start line number")
-							(integer :tag "End line number  "))))
+							(integer :tag "End line number  "))
+						  (function :tag "Function")))
 				  (string :tag "Extra grep options"))))
 
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -253,6 +261,10 @@ or by evaluating the car) will be used, but only the grep options from the first
   (while (get-buffer-process "*grep*") (sleep-for 0.3))
   (cl-loop for (file regions options) in fileregions
 	   with pos = 1
+	   for regions = (mapcar (lambda (r) (if (functionp r)
+						 (funcall r major-mode)
+					       r))
+				 regions)
 	   do (with-current-buffer (find-file-noselect file t)
 		(goto-char (point-min))
 		(setq regions (cl-loop
