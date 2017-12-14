@@ -256,7 +256,7 @@ or by evaluating the car) will be used, but only the grep options from the first
 		(goto-char (point-min))
 		(setq regions (cl-loop for region in regions
 				       for start = (if (stringp region)
-						       (concat "^\\(\\*+\\) " (regexp-quote region))
+						       (concat "^\\(\\*+\\) +" (regexp-quote region))
 						     (car region))
 				       for end = (if (stringp region) 'org-header (cdr region))
 				       for startline = (or (cond
