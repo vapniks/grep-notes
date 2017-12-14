@@ -124,10 +124,10 @@ OPTIONS is a string containing extra options for grep."
 				  (file :must-match t)
 				  (repeat :tag "Search within following regions"
 					  (cons :tag "Region"
-						(choice (integer :tag "Start line number")
-							(regexp :tag "Start regexp"))
-						(choice (integer :tag "End line number  ")
-							(regexp :tag "End regexp  "))))
+						(choice (regexp :tag "Start regexp")
+							(integer :tag "Start line number"))
+						(choice (regexp :tag "End regexp  ")
+							(integer :tag "End line number  "))))
 				  (string :tag "Extra grep options"))))
 
 (defcustom grep-notes-invisibility-spec '(t . (other))
