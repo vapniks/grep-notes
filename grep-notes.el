@@ -225,9 +225,12 @@ or by evaluating the car) will be used, but only the grep options from the first
 				  (if mark-active
 				      (buffer-substring-no-properties (region-beginning) (region-end))))
 		     (if current-prefix-arg
-			 (list (list (read-file-name "File to grep: ")
-				     nil
-				     (read-string "Extra options for grep: ")))
+			 (list (list (read-file-name "File to grep: "
+						     (and grep-notes-default-file
+							  (file-directory-p grep-notes-default-file)
+							  grep-notes-default-file)
+						     nil t)
+				     nil (read-string "Extra options for grep: ")))
 		       (or (cl-remove-if 'null
 					 (mapcar (lambda (val)
 						   (let ((test (car val)))
@@ -235,7 +238,14 @@ or by evaluating the car) will be used, but only the grep options from the first
 							 (if (eq major-mode test) (cdr val))
 						       (if (eval test) (cdr val)))))
 						 grep-notes-file-assoc))
-			   (list (list grep-notes-default-file nil nil))))))
+			   (list (list (if grep-notes-default-file
+					   (if (file-readable-p grep-notes-default-file)
+					       (if (file-directory-p grep-notes-default-file)
+						   (read-file-name "File to grep: " grep-notes-default-file nil t)
+						 grep-notes-default-file)
+					     (error "Cannot read file: %s" grep-notes-default-file))
+					 (read-file-name "File to grep: " nil nil t))
+				       nil nil))))))
   (let ((options (caddar fileregions)))
     (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
 		  " -e '" regex "' " (mapconcat (lambda (x) (expand-file-name (car x))) fileregions " "))))
