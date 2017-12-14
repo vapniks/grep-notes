@@ -196,10 +196,11 @@ If REGIONS is nil, all lines will be left unhidden."
 		       (forward-line 1))
 		      ((> linum regionend)
 		       (forward-line 0)
-		       (unless hidestart ;indicate that we have left a region
-			 (setq hidestart (point)))
-		       (if (> (length regions) 0)
-			   (setq region (pop regions))))
+		       (unless hidestart (setq hidestart (point))) ;indicate that we have left a region
+		       (if regions
+			   (setq region (pop regions))
+			 (setq region nil)
+			 (goto-char (point-max))))
 		      (t (unless (not hidestart) ;if this is the first matching line of the region, hide previous lines
 			   (add-text-properties hidestart (line-beginning-position)
 						'(invisible other))
