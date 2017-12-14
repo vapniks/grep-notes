@@ -123,10 +123,12 @@ OPTIONS is a string containing extra options for grep."
 		:value-type (list :tag "Search options  "
 				  (file :must-match t)
 				  (repeat :tag "Search within following regions"
-					  (cons :tag "Region"
-						(choice (regexp :tag "Start regexp")
-							(integer :tag "Start line number"))
-						(choice (regexp :tag "End regexp  ")
+					  (choice (string :tag "Org header")
+						  (cons :tag "Regexps"
+							(regexp :tag "Start regexp")
+							(regexp :tag "End regexp  "))
+						  (cons :tag "Line numbers"
+							(integer :tag "Start line number")
 							(integer :tag "End line number  "))))
 				  (string :tag "Extra grep options"))))
 
@@ -161,39 +163,53 @@ Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisi
   (redraw-frame))
 
 (defun grep-notes-add-props-to-grep (file regions pos)
-  "Add invisibility props to lines of *grep* buffer matching REGIONS of FILE.
-Start from position POS in *grep* buffer.
-Return the position of point in the *grep* buffer at the end of the search."
+  "Add invisibility props to lines of *grep* buffer matching FILE.
+REGIONS is a list of cons cells defining regions to be left unhidden,
+and POS is the position in the file to start searching from.
+If REGIONS is nil, all lines will be left unhidden."
   (with-current-buffer "*grep*"
     (let ((inhibit-read-only t)
 	  (rx (concat (regexp-quote (file-name-nondirectory file)) ":\\([0-9]+\\)"))
 	  (region (pop regions))
 	  (hidestart pos))
       (save-excursion
-	(goto-char pos)	  
-	(save-match-data
-	  (while (and region (re-search-forward rx nil t))
-	    (let ((linum (string-to-number (match-string 1)))
-		  (regionstart (car region))
-		  (regionend (cdr region)))
-	      (cond ((< linum regionstart) nil)
-		    ((> linum regionend) 
-		     (unless hidestart ;indicate that we have left a region
-		       (forward-line 0)
-		       (setq hidestart (point)))
-		     (if (> (length regions) 0)
-			 (setq region (pop regions))))
-		    (t (if hidestart	;if this is the first matching line of the region, hide previous lines
-			   (add-text-properties hidestart (line-beginning-position) '(invisible other)))
-		       ;; Add invisible properties to the filepath and line number
-		       (add-text-properties (line-beginning-position) (- (point) (length (match-string 1)))
-					    '(invisible path))
-		       (add-text-properties (- (point) (length (match-string 1))) (1+ (point))
-					    '(invisible linum))
-		       ;; indicate that we are in a region
-		       (if hidestart (setq hidestart nil))))
-	      (forward-line 1)))
-	  (if hidestart (add-text-properties hidestart (point) '(invisible other))))
+	(goto-char pos)
+	(if (not region)
+	    (while (re-search-forward rx nil t)
+	      ;; Add invisible properties to the filepath and line number
+	      (add-text-properties (line-beginning-position)
+				   (- (point) (length (match-string 1)))
+				   '(invisible path))
+	      (add-text-properties (- (point) (length (match-string 1))) (1+ (point))
+				   '(invisible linum))
+	      (forward-line 1))
+	  (save-match-data
+	    (while (and region (re-search-forward rx nil t))
+	      (let ((linum (string-to-number (match-string 1)))
+		    (regionstart (car region))
+		    (regionend (cdr region)))
+		(cond ((< linum regionstart) nil)
+		      ((> linum regionend)
+		       (unless hidestart ;indicate that we have left a region
+			 (forward-line 0)
+			 (setq hidestart (point)))
+		       (if (> (length regions) 0)
+			   (setq region (pop regions))))
+		      (t (if hidestart ;if this is the first matching line of the region, hide previous lines
+			     (add-text-properties hidestart (line-beginning-position)
+						  '(invisible other)))
+			 ;; Add invisible properties to the filepath and line number
+			 (add-text-properties (line-beginning-position)
+					      (- (point) (length (match-string 1)))
+					      '(invisible path))
+			 (add-text-properties (- (point) (length (match-string 1)))
+					      (1+ (point))
+					      '(invisible linum))
+			 ;; indicate that we are in a region
+			 (if hidestart (setq hidestart nil))))
+		(forward-line 1)))
+	    (if hidestart (add-text-properties hidestart
+					       (point) '(invisible other)))))
 	(point)))))
 
 ;;;###autoload
@@ -230,17 +246,26 @@ or by evaluating the car) will be used, but only the grep options from the first
 	   with pos = 1
 	   do (with-current-buffer (find-file-noselect file t)
 		(goto-char (point-min))
-		(setq regions (cl-loop for (start . end) in regions
-				       for startline = (cond ((numberp start) start)
-							     ((null start) (point-min))
-							     ((stringp start)
-							      (line-number-at-pos (or (re-search-forward start nil t)
-										      (point-min)))))
-				       for endline = (cond ((numberp end) end)
-							   ((null end) (point-max))
-							   ((stringp end)
-							    (line-number-at-pos (or (re-search-forward end nil t)
-										    (point-max)))))
+		(setq regions (cl-loop for region in regions
+				       for start = (if (stringp region)
+						       (concat "^\\(\\*+\\) " (regexp-quote region))
+						     (car region))
+				       for end = (if (stringp region) 'org-header (cdr region))
+				       for startline = (or (cond
+							    ((numberp start) start)
+							    ((stringp start)
+							     (line-number-at-pos (re-search-forward start nil t))))
+							   (point-min))
+				       for endline = (or (cond ((numberp end) end)
+							       ((stringp end)
+								(line-number-at-pos (re-search-forward end nil t)))
+							       ((eq end 'org-header)
+								(line-number-at-pos
+								 (if (match-string 1)
+								     (re-search-forward
+								      (concat "^" (regexp-quote (match-string 1)) " ")
+								      nil t)))))
+							 (point-max))
 				       collect (cons startline endline))))
 	   do (setq pos (grep-notes-add-props-to-grep file regions pos)))
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
