@@ -115,7 +115,7 @@ in buffers of the required type. FILE is the file to be grepped, or a glob patte
 matching multiple files (but in this case REGIONS will not be respected).
 REGIONS is a list of region specifications, each of which can take one of the following
 forms:
- 1) the name of an org header (without the initial stars or whitespace)
+ 1) a regexp matching an org header (without initial stars or whitespace, can include tags)
  2) a cons cell of regexps matching the start and end of the region
  3) a cons cell of start and end line numbers for the region
  4) a function which takes the current major-mode as argument and returns one of the 
@@ -124,20 +124,19 @@ forms:
 If REGIONS is empty then the whole file will be used.
 OPTIONS is a string containing extra options for grep."
   :group 'grep
-  :type '(alist :key-type (choice :tag "   Condition       "
+  :type '(alist :key-type (choice :tag "   Condition "
 				  (symbol :tag "Major-mode")
 				  (sexp :tag "S-expression"))
-		:value-type (list :tag "Search options  "
-				  (file :must-match t)
+		:value-type (list (file :must-match t)
 				  (repeat :tag "Search within following regions"
 					  (choice (string :tag "Org header")
-						  (cons :tag "Regexps"
+						  (cons :tag "Start/end regexps"
 							(regexp :tag "Start regexp")
 							(regexp :tag "End regexp  "))
 						  (cons :tag "Line numbers"
 							(integer :tag "Start line number")
 							(integer :tag "End line number  "))
-						  (function :tag "Function")))
+						  (function :tag "Function  ")))
 				  (string :tag "Extra grep options"))))
 
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -270,7 +269,7 @@ or by evaluating the car) will be used, but only the grep options from the first
 		(setq regions (cl-loop
 			       for region in regions
 			       for start = (if (stringp region)
-					       (concat "^\\(\\*+\\) +" (regexp-quote region))
+					       (concat "^\\*+\\s-+" region)
 					     (car region))
 			       for end = (if (stringp region) 'org-header (cdr region))
 			       for startline = (or (cond
