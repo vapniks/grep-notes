@@ -225,6 +225,40 @@ If REGIONS is nil, all lines will be left unhidden."
 					       (point) '(invisible other)))))
 	(point)))))
 
+(defun grep-notes-regexp-to-lines (startrx &optional endrx orgheaderp nowarn)
+  "Return a cons cell of line numbers matching STARTRX and ENDRX, or nil if none found.
+If ENDRX is nil then use the last line instead.
+If ORGHEADERP is non-nil then find org-header matching STARTRX, and return the start
+and end line numbers of that header and its contents.
+If STARTRX can't be found, either throw and error, or display a warning depending
+on the value of `grep-notes-skip-missing-regions'. If NOWARN is non-nil and STARTRX
+doesn't match then return nil with no error or warning even if `grep-notes-skip-missing-regions' 
+is non nil."
+  (cl-flet
+      ((nomatch (regex) (unless nowarn
+			  (let ((type (if orgheaderp "org-header" "region")))
+			    (if grep-notes-skip-missing-regions
+				(message "Warning: can't find %s matching \"%s\", skipping.."
+					 type regex)
+			      (error "Cant find %s matching \"%s\"" type regex))
+			    nil))))	;must return nil if there is no match
+    (let ((pos (re-search-forward startrx nil t))
+	  startline endline)
+      (if (not pos)
+	  (nomatch startrx)
+	(setq startline (line-number-at-pos pos))
+	(if orgheaderp
+	    (org-forward-heading-same-level 1)
+	  (if endrx
+	      (re-search-forward endrx nil t)
+	    (goto-char (point-max))))
+	(setq endline (line-number-at-pos))
+	(if orgheaderp
+	    (unless (/= endline startline)
+	      (org-next-visible-heading 1)
+	      (setq endline (line-number-at-pos))))
+	(cons startline endline)))))
+
 ;; TODO: allow matching multiple org-headers with single regexp, use a new type for this 'org-header-all
 ;;       (still need the 'org-header type for matching in specified order)
 ;;;###autoload
@@ -270,36 +304,25 @@ or by evaluating the car) will be used, but only the grep options from the first
   (cl-loop for (file regions options) in fileregions
 	   with pos = 1
 	   for newregions = nil
+	   for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
+				 regions) ;this need to be outside `with-current-buffer' 
 	   do (with-current-buffer (find-file-noselect file t)
 		(goto-char (point-min))
 		(cl-loop
-		 for region in (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
-				       regions)
-		 for start = (if (stringp region) (concat "^\\*+\\s-+" region)
-			       (car region))
-		 for end = (if (stringp region) 'org-header (cdr region))
-		 for startline = (or (cond
-				      ((numberp start) start)
-				      ((stringp start)
-				       (let ((newpos (re-search-forward start nil t)))
-					 (if newpos (line-number-at-pos newpos)
-					   (if grep-notes-skip-missing-regions
-					       (message "Cant find region matching \"%s\", skipping.." start)
-					     (error "Cant find region matching \"%s\"" start))
-					   nil))))
-				     (point-min))
-		 for endline = (or (cond ((numberp end) end)
-					 ((stringp end)
-					  (line-number-at-pos (re-search-forward end nil t)))
-					 ((eq end 'org-header)
-					  (unless (not startline)
-					    (org-forward-heading-same-level 1)
-					    (let ((line (line-number-at-pos)))
-					      (if (eq line startline)
-						  (org-next-visible-heading 1))
-					      line))))
-				   (point-max))
-		 do (push (cons startline endline) newregions)))
+		 for region in regions
+		 do (cond
+		     ((stringp region)
+		      (push (grep-notes-regexp-to-lines region nil t) newregions))
+		     ((and (consp region)
+			   (numberp (car region))
+			   (numberp (cdr region)))
+		      (push (cons (car region) (cdr region)) newregions))
+		     ((and (consp region)
+			   (stringp (car region))
+			   (stringp (cdr region)))
+		      (push (grep-notes-regexp-to-lines (car region) (cdr region)) newregions))
+		     ;; TODO: org-header-all type
+		     )))
 	   do (setq pos (grep-notes-add-props-to-grep
 			 file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
 					    (nreverse newregions))
