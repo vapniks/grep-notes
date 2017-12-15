@@ -207,7 +207,8 @@ If REGIONS is nil, all lines will be left unhidden."
 		       (if regions
 			   (setq region (pop regions))
 			 (setq region nil)
-			 (goto-char (point-max))))
+			 (while (re-search-forward rx nil t)) ;skip remaining lines for this file
+			 ))
 		      (t (unless (not hidestart) ;if this is the first matching line of the region, hide previous lines
 			   (add-text-properties hidestart (line-beginning-position)
 						'(invisible other))
