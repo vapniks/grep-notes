@@ -250,7 +250,8 @@ is non nil."
 	(if orgheaderp
 	    (org-forward-heading-same-level 1)
 	  (if endrx
-	      (re-search-forward endrx nil t)
+	      (unless (re-search-forward endrx nil t)
+		(nomatch endrx))
 	    (goto-char (point-max))))
 	(setq endline (line-number-at-pos))
 	(if orgheaderp
