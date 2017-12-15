@@ -157,6 +157,12 @@ filepaths at the beginning of each match, and 'linum hides line numbers."
 			    (const :tag "Hide file paths" path)
 			    (const :tag "Hide line numbers" linum)))))
 
+(defcustom grep-notes-skip-missing-regions nil
+  "If non-nil then if any regexp delimited region cannot be found it will be skipped.
+Otherwise an error will be thrown (this can happen if you put the regions in the wrong order)."
+  :group 'grep
+  :type 'boolean)
+
 ;;;###autoload
 (defun grep-notes-toggle-invisibility nil
   "Toggle which parts of the *grep* buffer are invisible.
@@ -219,6 +225,7 @@ If REGIONS is nil, all lines will be left unhidden."
 					       (point) '(invisible other)))))
 	(point)))))
 
+;; TODO: allow matching multiple org-headers with single regexp
 ;;;###autoload
 (defun grep-notes (regex &optional fileregions)
   "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
@@ -276,20 +283,28 @@ or by evaluating the car) will be used, but only the grep options from the first
 			       for startline = (or (cond
 						    ((numberp start) start)
 						    ((stringp start)
-						     (line-number-at-pos (re-search-forward start))))
+						     (let ((newpos (re-search-forward start nil t)))
+						       (if newpos (line-number-at-pos newpos)
+							 (if grep-notes-skip-missing-regions
+							     (message "Cant find region matching \"%s\", skipping.." start)
+							   (error "Cant find region matching \"%s\"" start))
+							 nil))))
 						   (point-min))
 			       for endline = (or (cond ((numberp end) end)
 						       ((stringp end)
 							(line-number-at-pos (re-search-forward end nil t)))
 						       ((eq end 'org-header)
-							(org-forward-heading-same-level 1)
-							(let ((line (line-number-at-pos)))
-							  (if (eq line startline)
-							      (org-next-visible-heading 1))
-							  line)))
+							(unless (not startline)
+							  (org-forward-heading-same-level 1)
+							  (let ((line (line-number-at-pos)))
+							    (if (eq line startline)
+								(org-next-visible-heading 1))
+							    line))))
 						 (point-max))
 			       collect (cons startline endline))))
-	   do (setq pos (grep-notes-add-props-to-grep file (cl-remove-if 'null regions) pos)))
+	   do (setq pos (grep-notes-add-props-to-grep
+			 file (cl-remove-if (lambda (r) (or (null r) (null (car r)))) regions)
+			 pos)))
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
