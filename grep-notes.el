@@ -246,7 +246,7 @@ is non nil."
 					 type regex)
 			      (error "Cant find %s matching \"%s\"" type regex))
 			    nil))))	;must return nil if there is no match
-    (let ((pos (re-search-forward startrx nil t))
+    (let ((pos (re-search-forward (concat (if orgheaderp "^\\*+\s-*") startrx) nil t))
 	  startline endline)
       (if (not pos)
 	  (nomatch startrx)
