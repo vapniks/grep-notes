@@ -121,8 +121,8 @@ forms:
  4) a function which takes the current major-mode as argument and returns one of the 
     aforementioned types. For example if the function is `symbol-name' then the associated
     regions will be org-headers named by the major-mode.
- 5) the symbol 'repeat - this will repeat the previous org-header or regexp region specification
-    until no more matches are possible.
+ 5) the symbol 'grep-note-repeat - this will repeat the previous org-header or regexp region 
+    specification until no more matches are possible.
 If REGIONS is empty then the whole file will be used.
 OPTIONS is a string containing extra options for grep."
   :group 'grep
