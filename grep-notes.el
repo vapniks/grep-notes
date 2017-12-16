@@ -56,7 +56,7 @@
 ;; Below is a complete list of commands:
 ;;
 ;;  `grep-notes'
-;;    grep for matches to REGEX between STARTLINE and ENDLINE in FILE.
+;;    grep for matches to REGEX within regions of associated file in `grep-notes-file-assoc'
 ;;    Keybinding: M-x grep-notes
 ;;
 ;;; Customizable Options:
@@ -64,10 +64,10 @@
 ;; Below is a list of customizable options:
 ;;
 ;;  `grep-notes-default-file'
-;;    Default file to use for `grep-notes' command when there is no file associated with 
+;;    Default file or directory to use for `grep-notes' command when there is no file associated with 
 ;;    default = "~/.emacs.d/notes/programming.org"
 ;;  `grep-notes-file-assoc'
-;;    Assoc list of the form (COND . (FILE START END)) for use with `grep-notes' command.
+;;    Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 ;;    default = nil
 
 ;;
