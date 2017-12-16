@@ -121,6 +121,8 @@ forms:
  4) a function which takes the current major-mode as argument and returns one of the 
     aforementioned types. For example if the function is `symbol-name' then the associated
     regions will be org-headers named by the major-mode.
+ 5) the symbol 'repeat - this will repeat the previous org-header or regexp region specification
+    until no more matches are possible.
 If REGIONS is empty then the whole file will be used.
 OPTIONS is a string containing extra options for grep."
   :group 'grep
@@ -136,7 +138,9 @@ OPTIONS is a string containing extra options for grep."
 						  (cons :tag "Line numbers"
 							(integer :tag "Start line number")
 							(integer :tag "End line number  "))
-						  (function :tag "Function  ")))
+						  (function :tag "Function returning a region spec")
+						  (const :tag "Repeat last org-header or regexp spec until no more matches"
+							 grep-notes-repeat)))
 				  (string :tag "Extra grep options"))))
 
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -260,8 +264,6 @@ is non nil."
 	      (setq endline (line-number-at-pos))))
 	(cons startline endline)))))
 
-;; TODO: allow matching multiple org-headers with single regexp, use a new type for this 'org-header-all
-;;       (still need the 'org-header type for matching in specified order)
 ;;;###autoload
 (defun grep-notes (regex &optional fileregions)
   "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
@@ -301,33 +303,42 @@ or by evaluating the car) will be used, but only the grep options from the first
   (let ((options (caddar fileregions)))
     (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
 		  " -e '" regex "' " (mapconcat (lambda (x) (expand-file-name (car x))) fileregions " "))))
-  (while (get-buffer-process "*grep*") (sleep-for 0.3))
-  (cl-loop for (file regions options) in fileregions
-	   with pos = 1
-	   for newregions = nil
-	   for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
-				 regions) ;this need to be outside `with-current-buffer' 
-	   do (with-current-buffer (find-file-noselect file t)
-		(goto-char (point-min))
-		(cl-loop
-		 for region in regions
-		 do (cond
-		     ((stringp region)
-		      (push (grep-notes-regexp-to-lines region nil t) newregions))
-		     ((and (consp region)
-			   (numberp (car region))
-			   (numberp (cdr region)))
-		      (push (cons (car region) (cdr region)) newregions))
-		     ((and (consp region)
-			   (stringp (car region))
-			   (stringp (cdr region)))
-		      (push (grep-notes-regexp-to-lines (car region) (cdr region)) newregions))
-		     ;; TODO: org-header-all type
-		     )))
-	   do (setq pos (grep-notes-add-props-to-grep
-			 file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
-					    (nreverse newregions))
-			 pos)))
+  ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
+  (macrolet ((getargs (region body)	
+		      `(destructuring-bind (start end orgp)
+			   (cond ((stringp ,region)
+				  (list ,region nil t))
+				 ((and (consp ,region)
+				       (or (stringp (car ,region))
+					   (and (numberp (car ,region))
+						(numberp (cdr ,region)))))
+				  (list (car ,region) (cdr ,region) nil))
+				 (t (error "Invalid region %s" ,region)))
+			 ,body)))
+    (while (get-buffer-process "*grep*") (sleep-for 0.3))
+    (cl-loop for (file regions options) in fileregions
+	     with pos = 1
+	     for newregions = nil
+	     for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
+				   regions) ;this need to be outside `with-current-buffer' 
+	     do (with-current-buffer (find-file-noselect file t)
+		  (goto-char (point-min))
+		  (cl-loop for region in regions
+			   with prevregion = nil
+			   do (if (eq region 'grep-notes-repeat)
+				  (getargs prevregion
+					   (if (numberp start) (error "Invalid repeated region")
+					     (while (car newregions)
+					       (push (grep-notes-regexp-to-lines start end orgp t)
+						     newregions))))
+				(getargs region
+					 (push (grep-notes-regexp-to-lines start end orgp)
+					       newregions)))
+			   (setq prevregion region)))
+	     do (setq pos (grep-notes-add-props-to-grep
+			   file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
+					      (nreverse newregions))
+			   pos))))
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
