@@ -275,7 +275,7 @@ and all of that file will be searched.
 
 Note: all elements of `grep-notes-file-assoc' whose cars match current conditions (either by major-mode,
 or by evaluating the car) will be used, but only the grep options from the first match will be used."
-  (interactive (list (read-regexp "Regex "
+  (interactive (list (read-regexp "Find notes matching regexp"
 				  (if mark-active
 				      (buffer-substring-no-properties (region-beginning) (region-end))))
 		     (if current-prefix-arg
