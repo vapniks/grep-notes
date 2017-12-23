@@ -111,9 +111,9 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
-in buffers of the required type. FILE is the file to be grepped, or a glob pattern for
-matching multiple files (but in this case REGIONS will not be respected), or a function which
-returns either of those things.
+in buffers of the required type. FILE is the file to be grepped, or a glob pattern for matching 
+multiple files (but in this case REGIONS will not be respected), or a function which returns 
+either of those things.
 REGIONS is a list of region specifications, each of which can take one of the following
 forms:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
@@ -353,14 +353,43 @@ or by evaluating the car) will be used, but only the grep options from the first
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
-(defun grep-notes-make-manpage-file (name)
-  "Create a temporary file containing contents of manpage NAME.
-Return the filename."
-  (let ((Man-notify-method 'meek)
-	(file (make-temp-file (concat name "_manpage_"))))
-    (with-current-buffer (Man-getpage-in-background name)
-      (write-region (point-min) (point-max) file))
-    file))
+(defun grep-notes-make-manpage-files (names)
+  "Create a temporary files containing contents of manpage(s) in NAMES.
+NAMES can be the name of a manpage, or a list of such names. If it is
+a list of names then a glob pattern matching the filenames will be returned,
+otherwise a single filename will be returned."
+  (let ((Man-notify-method 'meek))
+    (if (listp names)
+	(let ((files (cl-loop for name in names
+			      for file = (make-temp-file (concat name "_manpage_"))
+			      do (with-current-buffer (Man-getpage-in-background name)
+				   (write-region (point-min) (point-max) file))
+			      collect file)))
+	  (concat temporary-file-directory
+		  "{"
+		  (mapconcat (lambda (f) (file-name-nondirectory f)) files ",")
+		  "}"))
+      (let ((file (make-temp-file (concat names "_manpage_"))))
+	(with-current-buffer (Man-getpage-in-background names)
+	  (write-region (point-min) (point-max) file))
+	file))))
+
+;; simple-call-tree-info: TODO get this working properly
+(defun grep-notes-guess-manpages nil
+  "Try to guess appropriate manpages for the current context."
+  (let ((etcparts (cdr (member "etc"
+			       (split-string buffer-file-name "/"))))
+	(rxsuffix "\\(:?(.*)\\)?$"))
+    (if etcparts
+	(let* ((filename (car etcparts))
+	       (rx (concat "^"
+			   (regexp-opt (append (list filename
+						     (replace-regexp-in-string
+						      "\\.conf$" "" filename))
+					       (last etcparts)))
+			   rxsuffix)))
+	  (mapcar 'substring-no-properties
+		  (Man-completion-table "" (lambda (name) (string-match rx name)) t))))))
 
 (provide 'grep-notes)
 
