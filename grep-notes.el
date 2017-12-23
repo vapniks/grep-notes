@@ -111,9 +111,9 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
-in buffers of the required type. FILE is the file to be grepped, or a glob pattern for matching 
-multiple files (but in this case REGIONS will not be respected), or a function which returns 
-either of those things.
+in buffers of the required type. FILE is the file to be grepped, or a list of such files, 
+or a glob pattern for matching multiple files (but in this case REGIONS will not be respected), 
+or a function which returns any of those things.
 REGIONS is a list of region specifications, each of which can take one of the following
 forms:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
@@ -131,6 +131,7 @@ OPTIONS is a string containing extra options for grep."
 				  (symbol :tag "Major-mode")
 				  (sexp :tag "S-expression"))
 		:value-type (list (choice (file :must-match t)
+					  (repeat (file :must-match t))
 					  (function :tag "Function"
 						    :help-echo
 						    "Function with no arguments which returns a filename"))
@@ -305,17 +306,27 @@ or by evaluating the car) will be used, but only the grep options from the first
 					     (error "Cannot read file: %s" grep-notes-default-file))
 					 (read-file-name "File to grep: " nil nil t))
 				       nil nil))))))
-  (let ((options (caddar fileregions)))
-    (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
-		  " -e '" regex "' " (mapconcat (lambda (x)
-						  (let ((val (car x)))
-						    (expand-file-name
-						     (cond ((stringp val) val)
-							   ((functionp val) (funcall val))
-							   (t (error "Invalid file argument: %s" val))))))
-						fileregions " "))))
+  ;; expand elements with multiple files into multiple elements
+  (setq fileregions (cl-loop for (files regions options) in fileregions
+			     if (stringp files) collect (list files regions options)
+			     else if (listp files)
+			     nconc (mapcar (lambda (file) (list file regions options)) files)
+			     else if (functionp files)
+			     nconc (let ((vals (funcall files)))
+				     (if (stringp vals)
+					 (list (list vals regions options))
+				       (mapcar (lambda (file) (list file regions options)) vals)))
+			     else do (error "Invalid file(s) argument: %s" files)))
+  (let ((opts (caddar fileregions)))
+    (grep (concat "grep --color -nH "
+		  (if (or (null opts)
+			  (equal opts ""))
+		      grep-notes-default-options
+		    opts)
+		  " -e '" regex "' "
+		  (mapconcat (lambda (x) (expand-file-name (car x))) fileregions " "))))
   ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
-  (macrolet ((getargs (region body)	
+  (macrolet ((getargs (region body)
 		      `(destructuring-bind (start end orgp)
 			   (cond ((stringp ,region)
 				  (list ,region nil t))
@@ -331,7 +342,7 @@ or by evaluating the car) will be used, but only the grep options from the first
 	     with pos = 1
 	     for newregions = nil
 	     for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
-				   regions) ;this need to be outside `with-current-buffer' 
+				   regions) ;this needs to be outside `with-current-buffer'
 	     do (with-current-buffer (find-file-noselect file t)
 		  (goto-char (point-min))
 		  (cl-loop for region in regions
@@ -353,29 +364,24 @@ or by evaluating the car) will be used, but only the grep options from the first
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
-(defun grep-notes-make-manpage-files (names)
-  "Create a temporary files containing contents of manpage(s) in NAMES.
-NAMES can be the name of a manpage, or a list of such names. If it is
-a list of names then a glob pattern matching the filenames will be returned,
-otherwise a single filename will be returned."
+(defun grep-notes-make-manpage-files (&optional names)
+  "Return names of temporary files containing contents of manpage(s) in NAMES.
+NAMES can be the name of a manpage, or a list of such names, of nil. 
+If NAMES is nil then `grep-notes-guess-manpages' will be called to try and guess 
+manpage names to use, but if this returns nil then nil will be returned."
   (let ((Man-notify-method 'meek))
-    (if (listp names)
-	(let ((files (cl-loop for name in names
-			      for file = (make-temp-file (concat name "_manpage_"))
-			      do (with-current-buffer (Man-getpage-in-background
-						       (Man-translate-references name))
-				   (while (get-buffer-process (current-buffer))) ;wait for man to finish
-				   (write-region (point-min) (point-max) file))
-			      collect file)))
-	  (concat temporary-file-directory
-		  "{"
-		  (mapconcat (lambda (f) (file-name-nondirectory f)) files ",")
-		  "}"))
-      (let ((file (make-temp-file (concat names "_manpage_"))))
-	(with-current-buffer (Man-getpage-in-background
-			      (Man-translate-references names))
-	  (write-region (point-min) (point-max) file))
-	file))))
+    (setq names (cond ((stringp names) (list names))
+		      ((null names) (grep-notes-guess-manpages))
+		      ((listp names) names)))
+    (if names
+	(cl-loop for name in names
+		 for file = (make-temp-file (concat (replace-regexp-in-string "[()]" "" name)
+						    "_manpage_"))
+		 do (with-current-buffer (Man-getpage-in-background
+					  (Man-translate-references name))
+		      (while (get-buffer-process (current-buffer))) ;wait for man to finish
+		      (write-region nil nil file))
+		 collect file))))
 
 ;; simple-call-tree-info: TODO get this working properly
 (defun grep-notes-guess-manpages nil
