@@ -112,7 +112,8 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
   "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
 in buffers of the required type. FILE is the file to be grepped, or a glob pattern for
-matching multiple files (but in this case REGIONS will not be respected).
+matching multiple files (but in this case REGIONS will not be respected), or a function which
+returns either of those things.
 REGIONS is a list of region specifications, each of which can take one of the following
 forms:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
@@ -129,7 +130,10 @@ OPTIONS is a string containing extra options for grep."
   :type '(alist :key-type (choice :tag "   Condition "
 				  (symbol :tag "Major-mode")
 				  (sexp :tag "S-expression"))
-		:value-type (list (file :must-match t)
+		:value-type (list (choice (file :must-match t)
+					  (function :tag "Function"
+						    :help-echo
+						    "Function with no arguments which returns a filename"))
 				  (repeat :tag "Search within following regions"
 					  (choice (string :tag "Org header")
 						  (cons :tag "Start/end regexps"
@@ -265,6 +269,7 @@ is non nil."
 	(cons startline endline)))))
 
 ;;;###autoload
+;; simple-call-tree-info: TODO ability to grep manpages
 (defun grep-notes (regex &optional fileregions)
   "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
 
@@ -302,7 +307,13 @@ or by evaluating the car) will be used, but only the grep options from the first
 				       nil nil))))))
   (let ((options (caddar fileregions)))
     (grep (concat "grep --color -nH " (if (equal options "") grep-notes-default-options options)
-		  " -e '" regex "' " (mapconcat (lambda (x) (expand-file-name (car x))) fileregions " "))))
+		  " -e '" regex "' " (mapconcat (lambda (x)
+						  (let ((val (car x)))
+						    (expand-file-name
+						     (cond ((stringp val) val)
+							   ((functionp val) (funcall val))
+							   (t (error "Invalid file argument: %s" val))))))
+						fileregions " "))))
   ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
   (macrolet ((getargs (region body)	
 		      `(destructuring-bind (start end orgp)
