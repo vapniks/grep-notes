@@ -353,6 +353,15 @@ or by evaluating the car) will be used, but only the grep options from the first
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
+(defun grep-notes-make-manpage-file (name)
+  "Create a temporary file containing contents of manpage NAME.
+Return the filename."
+  (let ((Man-notify-method 'meek)
+	(file (make-temp-file (concat name "_manpage_"))))
+    (with-current-buffer (Man-getpage-in-background name)
+      (write-region (point-min) (point-max) file))
+    file))
+
 (provide 'grep-notes)
 
 ;; (org-readme-sync)
