@@ -362,7 +362,9 @@ otherwise a single filename will be returned."
     (if (listp names)
 	(let ((files (cl-loop for name in names
 			      for file = (make-temp-file (concat name "_manpage_"))
-			      do (with-current-buffer (Man-getpage-in-background name)
+			      do (with-current-buffer (Man-getpage-in-background
+						       (Man-translate-references name))
+				   (while (get-buffer-process (current-buffer))) ;wait for man to finish
 				   (write-region (point-min) (point-max) file))
 			      collect file)))
 	  (concat temporary-file-directory
@@ -370,7 +372,8 @@ otherwise a single filename will be returned."
 		  (mapconcat (lambda (f) (file-name-nondirectory f)) files ",")
 		  "}"))
       (let ((file (make-temp-file (concat names "_manpage_"))))
-	(with-current-buffer (Man-getpage-in-background names)
+	(with-current-buffer (Man-getpage-in-background
+			      (Man-translate-references names))
 	  (write-region (point-min) (point-max) file))
 	file))))
 
@@ -389,7 +392,8 @@ otherwise a single filename will be returned."
 					       (last etcparts)))
 			   rxsuffix)))
 	  (mapcar 'substring-no-properties
-		  (Man-completion-table "" (lambda (name) (string-match rx name)) t))))))
+		  (Man-completion-table
+		   "" (lambda (name) (string-match rx name)) t))))))
 
 (provide 'grep-notes)
 
