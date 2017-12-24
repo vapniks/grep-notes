@@ -386,13 +386,16 @@ NAMES can be the name of a manpage, or a list of such names, of nil.
 If NAMES is nil then `grep-notes-guess-manpages' will be called to try and guess 
 manpage names to use, but if this returns nil then nil will be returned."
   (let ((Man-notify-method 'meek))
+    ;; Remove previously generated manpages unless they are currently loaded
+    ;; to avoid accumulation of unwanted files
+    (mapcar 'delete-file (directory-files temporary-file-directory t "_grep-notes_manpage_"))
     (setq names (cond ((stringp names) (list names))
 		      ((null names) (grep-notes-guess-manpages))
 		      ((listp names) names)))
     (if names
 	(cl-loop for name in names
 		 for file = (make-temp-file (concat (replace-regexp-in-string "[()]" "" name)
-						    "_manpage_"))
+						    "_grep-notes_manpage_"))
 		 do (with-current-buffer (Man-getpage-in-background
 					  (Man-translate-references name))
 		      (while (get-buffer-process (current-buffer))) ;wait for man to finish
@@ -410,20 +413,22 @@ manpage names to use, but if this returns nil then nil will be returned."
 	 (logparts (and parts (cl-member "^log$" parts :test 'string-match)))
 	 namesrx)
     (setq namesrx (regexp-opt
-		   (cond (etcparts
-			  (append
-			   (list buffer-file-name
-				 (file-name-sans-extension buffer-file-name)
-				 (replace-regexp-in-string
-				  "[^[:alnum:]]+.*$" "" buffer-file-name))
-			   (list (cadr etcparts))))
-			 (logparts
-			  (list (cadr logparts)
-				(file-name-sans-extension (cadr logparts))
-				(replace-regexp-in-string
-				 "[^[:alnum:]]+.*$" "" (cadr logparts))))
-			 ((eq major-mode 'sh-mode)
-			  (list (thing-at-point 'symbol))))))
+		   (let ((name (if etcparts (car (last etcparts))
+				 (if logparts (cadr logparts)))))
+		     (cond (etcparts
+			    (append
+			     (list name
+				   (file-name-sans-extension name)
+				   (replace-regexp-in-string
+				    "[^[:alnum:]]+.*$" "" name))
+			     (list (cadr etcparts))))
+			   (logparts
+			    (list name
+				  (file-name-sans-extension name)
+				  (replace-regexp-in-string
+				   "[^[:alnum:]]+.*$" "" name)))
+			   ((eq major-mode 'sh-mode)
+			    (list (thing-at-point 'symbol)))))))
     (if (not (equal namesrx ""))
 	(mapcar 'substring-no-properties
 		(Man-completion-table
