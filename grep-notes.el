@@ -95,6 +95,7 @@
 ;;; Code:
 
 
+;; simple-call-tree-info: DONE
 (defcustom grep-notes-default-file nil
   "Default file to use for `grep-notes' command.
 If nil then `grep-notes' will prompt for the file.
@@ -102,12 +103,14 @@ If a directory then `grep-notes' will prompt for a file within that directory."
   :group 'grep
   :type 'file)
 
+;; simple-call-tree-info: DONE
 (defcustom grep-notes-default-options "-i"
   "Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
 Useful options could be -i (case-insensitive search), and -C <N> (include <N> lines of context)."
   :group 'grep
   :type 'string)
 
+;; simple-call-tree-info: DONE
 (defcustom grep-notes-file-assoc nil
   "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
@@ -148,6 +151,7 @@ OPTIONS is a string containing extra options for grep."
 							 grep-notes-repeat)))
 				  (string :tag "Extra grep options"))))
 
+;; simple-call-tree-info: DONE
 (defcustom grep-notes-invisibility-spec '(t . (other))
   "Indicate which parts of the *grep* buffer to hide by default.
 The car and cdr of this cons cell will be used to set `buffer-invisibility-spec' into 
@@ -166,13 +170,21 @@ filepaths at the beginning of each match, and 'linum hides line numbers."
 			    (const :tag "Hide file paths" path)
 			    (const :tag "Hide line numbers" linum)))))
 
+;; simple-call-tree-info: DONE
 (defcustom grep-notes-skip-missing-regions nil
   "If non-nil then if any regexp delimited region cannot be found it will be skipped.
 Otherwise an error will be thrown (this can happen if you put the regions in the wrong order)."
   :group 'grep
   :type 'boolean)
 
+;; simple-call-tree-info: DONE
+(defcustom grep-note-more-manpages t
+  "If non-nil then `grep-notes-guess-manpages' will be less restrictive in its choice of manpages."
+  :group 'grep
+  :type 'boolean)
+
 ;;;###autoload
+;; simple-call-tree-info: DONE  
 (defun grep-notes-toggle-invisibility nil
   "Toggle which parts of the *grep* buffer are invisible.
 Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisibility-spec'."
@@ -184,6 +196,7 @@ Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisi
 	  (car grep-notes-invisibility-spec)))
   (redraw-frame))
 
+;; simple-call-tree-info: DONE
 (defun grep-notes-propertize-line (pos offset)
   "Add inivisble 'path & 'linum props to current line in *grep* buffer.
 POS is position of end of line number, OFFSET is length of line number."
@@ -193,6 +206,7 @@ POS is position of end of line number, OFFSET is length of line number."
   (add-text-properties (- pos (length offset)) (1+ pos)
 		       '(invisible linum)))
 
+;; simple-call-tree-info: DONE
 (defun grep-notes-add-props-to-grep (file regions pos)
   "Add invisibility props to lines of *grep* buffer matching FILE.
 REGIONS is a list of cons cells defining regions to be left unhidden,
@@ -234,6 +248,7 @@ If REGIONS is nil, all lines will be left unhidden."
 					       (point) '(invisible other)))))
 	(point)))))
 
+;; simple-call-tree-info: DONE
 (defun grep-notes-regexp-to-lines (startrx &optional endrx orgheaderp nowarn)
   "Return a cons cell of line numbers matching STARTRX and ENDRX, or nil if none found.
 If ENDRX is nil then use the last line instead.
@@ -270,7 +285,7 @@ is non nil."
 	(cons startline endline)))))
 
 ;;;###autoload
-;; simple-call-tree-info: TODO ability to grep manpages
+;; simple-call-tree-info: DONE  ability to grep manpages
 (defun grep-notes (regex &optional fileregions)
   "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
 
@@ -364,6 +379,7 @@ or by evaluating the car) will be used, but only the grep options from the first
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
+;; simple-call-tree-info: DONE
 (defun grep-notes-make-manpage-files (&optional names)
   "Return names of temporary files containing contents of manpage(s) in NAMES.
 NAMES can be the name of a manpage, or a list of such names, of nil. 
@@ -383,23 +399,37 @@ manpage names to use, but if this returns nil then nil will be returned."
 		      (write-region nil nil file))
 		 collect file))))
 
-;; simple-call-tree-info: TODO get this working properly
+;; simple-call-tree-info: TODO can this be improved?
 (defun grep-notes-guess-manpages nil
   "Try to guess appropriate manpages for the current context."
-  (let ((etcparts (cdr (member "etc"
-			       (split-string buffer-file-name "/"))))
-	(rxsuffix "\\(:?(.*)\\)?$"))
-    (if etcparts
-	(let* ((filename (car etcparts))
-	       (rx (concat "^"
-			   (regexp-opt (append (list filename
-						     (replace-regexp-in-string
-						      "\\.conf$" "" filename))
-					       (last etcparts)))
-			   rxsuffix)))
-	  (mapcar 'substring-no-properties
-		  (Man-completion-table
-		   "" (lambda (name) (string-match rx name)) t))))))
+  (let* ((rxsuffix (concat "\\(:?(.*)\\)?"
+			   (if grep-note-more-manpages "\\([^[:alpha:]]+.*\\)?")
+			   "$"))
+	 (parts (split-string buffer-file-name "/"))
+	 (etcparts (and parts (cl-member "^etc$" parts :test 'string-match)))
+	 (logparts (and parts (cl-member "^log$" parts :test 'string-match)))
+	 namesrx)
+    (setq namesrx (regexp-opt
+		   (cond (etcparts
+			  (append
+			   (list buffer-file-name
+				 (file-name-sans-extension buffer-file-name)
+				 (replace-regexp-in-string
+				  "[^[:alnum:]]+.*$" "" buffer-file-name))
+			   (list (cadr etcparts))))
+			 (logparts
+			  (list (cadr logparts)
+				(file-name-sans-extension (cadr logparts))
+				(replace-regexp-in-string
+				 "[^[:alnum:]]+.*$" "" (cadr logparts))))
+			 ((eq major-mode 'sh-mode)
+			  (list (thing-at-point 'symbol))))))
+    (if (not (equal namesrx ""))
+	(mapcar 'substring-no-properties
+		(Man-completion-table
+		 "" (lambda (name)
+		      (string-match (concat "^" namesrx rxsuffix) name))
+		 t)))))
 
 (provide 'grep-notes)
 
