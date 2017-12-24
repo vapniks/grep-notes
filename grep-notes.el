@@ -403,7 +403,7 @@ manpage names to use, but if this returns nil then nil will be returned."
   (let ((Man-notify-method 'meek))
     ;; Remove previously generated manpages unless they are currently loaded
     ;; to avoid accumulation of unwanted files
-    (mapcar 'delete-file (directory-files temporary-file-directory t "_grep-notes_manpage_"))
+    (mapc 'delete-file (directory-files temporary-file-directory t "_grep-notes_manpage_"))
     (setq names (cond ((stringp names) (list names))
 		      ((null names) (grep-notes-guess-manpages))
 		      ((listp names) names)))
