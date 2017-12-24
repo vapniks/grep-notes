@@ -373,6 +373,7 @@ or by evaluating the car) will be used, but only the grep options from the first
 	     for newregions = nil
 	     for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
 				   regions) ;this needs to be outside `with-current-buffer'
+	     for existingbuf = (get-file-buffer file)
 	     do (with-current-buffer (find-file-noselect file t)
 		  (goto-char (point-min))
 		  (cl-loop for region in regions
@@ -387,6 +388,7 @@ or by evaluating the car) will be used, but only the grep options from the first
 					 (push (grep-notes-regexp-to-lines start end orgp)
 					       newregions)))
 			   (setq prevregion region)))
+	     (unless existingbuf (kill-buffer (get-file-buffer file)))
 	     (setq pos (grep-notes-add-props-to-grep
 			file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
 					   (nreverse newregions))
