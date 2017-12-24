@@ -55,20 +55,35 @@
 ;;
 ;; Below is a complete list of commands:
 ;;
+;;  `grep-notes-toggle-invisibility'
+;;    Toggle which parts of the *grep* buffer are invisible.
+;;    Keybinding: M-x grep-notes-toggle-invisibility
 ;;  `grep-notes'
-;;    grep for matches to REGEX within regions of associated file in `grep-notes-file-assoc'
-;;    Keybinding: M-x grep-notes
+;;    Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
+;;    Keybinding: C-M-s-n
 ;;
 ;;; Customizable Options:
 ;;
 ;; Below is a list of customizable options:
 ;;
 ;;  `grep-notes-default-file'
-;;    Default file or directory to use for `grep-notes' command when there is no file associated with 
-;;    default = "~/.emacs.d/notes/programming.org"
+;;    Default file to use for `grep-notes' command.
+;;    default = nil
+;;  `grep-notes-default-options'
+;;    Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
+;;    default = "-i"
 ;;  `grep-notes-file-assoc'
 ;;    Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
 ;;    default = nil
+;;  `grep-notes-invisibility-spec'
+;;    Indicate which parts of the *grep* buffer to hide by default.
+;;    default = (quote (t other))
+;;  `grep-notes-skip-missing-regions'
+;;    If non-nil then if any regexp delimited region cannot be found it will be skipped.
+;;    default = nil
+;;  `grep-note-more-manpages'
+;;    If non-nil then `grep-notes-guess-manpages' will be less restrictive in its choice of manpages.
+;;    default = t
 
 ;;
 ;; All of the above can be customized by:
@@ -116,7 +131,7 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
 in buffers of the required type. FILE is the file to be grepped, or a list of such files, 
 or a glob pattern for matching multiple files (but in this case REGIONS will not be respected), 
-or a function which returns any of those things.
+or a function which returns any of those things (e.g. `grep-notes-make-manpage-files').
 REGIONS is a list of region specifications, each of which can take one of the following
 forms:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
