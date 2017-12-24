@@ -387,10 +387,10 @@ or by evaluating the car) will be used, but only the grep options from the first
 					 (push (grep-notes-regexp-to-lines start end orgp)
 					       newregions)))
 			   (setq prevregion region)))
-	     do (setq pos (grep-notes-add-props-to-grep
-			   file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
-					      (nreverse newregions))
-			   pos))))
+	     (setq pos (grep-notes-add-props-to-grep
+			file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
+					   (nreverse newregions))
+			pos))))
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
