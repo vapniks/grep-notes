@@ -300,7 +300,7 @@ is non nil."
 	(cons startline endline)))))
 
 ;;;###autoload
-;; simple-call-tree-info: DONE  ability to grep manpages
+;; simple-call-tree-info: CHECK
 (defun grep-notes (regex &optional fileregions)
   "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
 
@@ -394,27 +394,29 @@ or by evaluating the car) will be used, but only the grep options from the first
   (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
   (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
 
-;; simple-call-tree-info: DONE
+;; simple-call-tree-info: CHECK
 (defun grep-notes-make-manpage-files (&optional names)
   "Return names of temporary files containing contents of manpage(s) in NAMES.
 NAMES can be the name of a manpage, or a list of such names, of nil. 
 If NAMES is nil then `grep-notes-guess-manpages' will be called to try and guess 
 manpage names to use, but if this returns nil then nil will be returned."
   (let ((Man-notify-method 'meek))
-    ;; Remove previously generated manpages unless they are currently loaded
-    ;; to avoid accumulation of unwanted files
-    (mapc 'delete-file (directory-files temporary-file-directory t "_grep-notes_manpage_"))
     (setq names (cond ((stringp names) (list names))
 		      ((null names) (grep-notes-guess-manpages))
 		      ((listp names) names)))
     (if names
 	(cl-loop for name in names
-		 for file = (make-temp-file (concat (replace-regexp-in-string "[()]" "" name)
-						    "_grep-notes_manpage_"))
-		 do (with-current-buffer (Man-getpage-in-background
-					  (Man-translate-references name))
-		      (while (get-buffer-process (current-buffer))) ;wait for man to finish
-		      (write-region nil nil file))
+		 for sanename = (concat (replace-regexp-in-string "[()]" "_" name)
+					"_grep-notes_manpage_")
+		 for existingfile = (car (directory-files temporary-file-directory
+							  t (regexp-quote sanename)))
+		 for file = (or existingfile (make-temp-file sanename))
+		 do (unless existingfile
+		      (with-current-buffer (Man-getpage-in-background
+					    (Man-translate-references name))
+			(sleep-for 0.1)
+			(while (get-buffer-process (current-buffer))) ;wait for man to finish
+			(write-region nil nil file)))
 		 collect file))))
 
 ;; simple-call-tree-info: TODO can this be improved?
