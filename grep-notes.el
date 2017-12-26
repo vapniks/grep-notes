@@ -317,7 +317,7 @@ is non nil."
 
 When called interactively REGEX will be prompted for and FILEREGIONS will be obtained 
 from `grep-notes-file-assoc' or `grep-notes-default-file' if there are none. 
-If called with a prefix arg, then a file and grep options will be prompted for, 
+If called with a non-numeric prefix arg, then a file and grep options will be prompted for, 
 and all of that file will be searched.
 
 Note: all elements of `grep-notes-file-assoc' whose cars match current conditions (either by major-mode,
