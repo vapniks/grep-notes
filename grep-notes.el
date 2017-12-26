@@ -109,6 +109,9 @@
 
 ;;; Code:
 
+;; TODO:
+;;   1) Option to use helm to display results?
+;;   2) Ability to quickly copy and paste parts of results strings (matched by another regexp?)
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-default-file nil
@@ -127,7 +130,7 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-file-assoc nil
-  "Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
+  "Assoc list of the form (COND . (FILE REGIONS OPTIONS PREFIXES)) for use with `grep-notes' command.
 COND can be either a major-mode symbol or an sexp which evaluates to non-nil
 in buffers of the required type. FILE is the file to be grepped, or a list of such files, 
 or a glob pattern for matching multiple files (but in this case REGIONS will not be respected), 
@@ -143,7 +146,13 @@ forms:
  5) the symbol 'grep-note-repeat - this will repeat the previous org-header or regexp region 
     specification until no more matches are possible.
 If REGIONS is empty then the whole file will be used.
-OPTIONS is a string containing extra options for grep."
+OPTIONS is an optional string containing extra options for grep.
+
+PREFIXES is an optional list of positive integers indicating which numeric prefixes activate
+this entry. If this list is nil (default) then this entry will always be tried. Otherwise it
+will only be tried when one of the numeric prefixes in the list is used. 
+If you assign higher prefix keys to entries that are slower to compute this allows you to
+use prefix keys to choose between a fast shallow search and a slow deep search for example."
   :group 'grep
   :type '(alist :key-type (choice :tag "   Condition "
 				  (symbol :tag "Major-mode")
@@ -164,7 +173,9 @@ OPTIONS is a string containing extra options for grep."
 						  (function :tag "Function returning a region spec")
 						  (const :tag "Repeat last org-header or regexp spec until no more matches"
 							 grep-notes-repeat)))
-				  (string :tag "Extra grep options"))))
+				  (string :tag "Extra grep options")
+				  (repeat :tag "Prefix keys restriction"
+					  (integer :tag "Prefix")))))
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -314,7 +325,8 @@ or by evaluating the car) will be used, but only the grep options from the first
   (interactive (list (read-regexp "Find notes matching regexp"
 				  (if mark-active
 				      (buffer-substring-no-properties (region-beginning) (region-end))))
-		     (if current-prefix-arg
+		     (if (and current-prefix-arg
+			      (listp current-prefix-arg))
 			 (list (list (read-file-name "File to grep: "
 						     (and grep-notes-default-file
 							  (file-directory-p grep-notes-default-file)
@@ -324,20 +336,25 @@ or by evaluating the car) will be used, but only the grep options from the first
 		       (or (cl-remove-if 'null
 					 (mapcar (lambda (val)
 						   (let ((test (car val)))
-						     (if (symbolp test)
-							 (if (eq major-mode test) (cdr val))
-						       (if (eval test) (cdr val)))))
+						     (and (if (symbolp test)
+							      (eq major-mode test)
+							    (eval test))
+							  (or (null (cl-fourth (cdr val)))
+							      (memq (prefix-numeric-value current-prefix-arg)
+								    (cl-fourth (cdr val))))
+							  (cdr val))))
 						 grep-notes-file-assoc))
 			   (list (list (if grep-notes-default-file
 					   (if (file-readable-p grep-notes-default-file)
 					       (if (file-directory-p grep-notes-default-file)
-						   (read-file-name "File to grep: " grep-notes-default-file nil t)
+						   (read-file-name
+						    "File to grep: " grep-notes-default-file nil t)
 						 grep-notes-default-file)
 					     (error "Cannot read file: %s" grep-notes-default-file))
 					 (read-file-name "File to grep: " nil nil t))
 				       nil nil))))))
   ;; expand elements with multiple files into multiple elements
-  (setq fileregions (cl-loop for (files regions options) in fileregions
+  (setq fileregions (cl-loop for (files regions options prefixes) in fileregions
 			     if (stringp files) collect (list files regions options)
 			     else if (listp files)
 			     nconc (mapcar (lambda (file) (list file regions options)) files)
