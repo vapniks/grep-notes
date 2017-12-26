@@ -438,7 +438,7 @@ manpage names to use, but if this returns nil then nil will be returned."
 			(write-region nil nil file)))
 		 collect file))))
 
-;; simple-call-tree-info: TODO can this be improved?
+;; simple-call-tree-info: CHECK  can this be improved?
 (defun grep-notes-guess-manpages nil
   "Try to guess appropriate manpages for the current context."
   (let* ((rxsuffix (concat "\\(:?(.*)\\)?"
