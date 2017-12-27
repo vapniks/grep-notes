@@ -324,7 +324,8 @@ Note: all elements of `grep-notes-file-assoc' whose cars match current condition
 or by evaluating the car) will be used, but only the grep options from the first match will be used."
   (interactive (list (read-regexp "Find notes matching regexp"
 				  (if mark-active
-				      (buffer-substring-no-properties (region-beginning) (region-end))))
+				      (buffer-substring-no-properties (region-beginning) (region-end))
+				    (thing-at-point 'symbol)))
 		     (if (and current-prefix-arg
 			      (listp current-prefix-arg))
 			 (list (list (read-file-name "File to grep: "
