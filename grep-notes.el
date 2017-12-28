@@ -473,6 +473,17 @@ manpage names to use, but if this returns nil then nil will be returned."
 		      (string-match (concat "^" namesrx rxsuffix) name))
 		 t)))))
 
+;;;###autoload
+(defun grep-notes-clear-stored-manpages nil
+  "Delete all manpages created by `grep-notes-make-manpage-files'.
+Use this command if you dont seem to be getting the right results from
+searching manpages using `grep-notes'. It may be because the manpages
+were not rendered properly, and need to be recreated."
+  (interactive)
+  (mapcar 'delete-file
+	  (directory-files
+	   temporary-file-directory t "_grep-notes_manpage_")))
+
 (provide 'grep-notes)
 
 ;; (org-readme-sync)
