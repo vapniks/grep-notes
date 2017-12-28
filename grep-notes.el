@@ -357,13 +357,13 @@ or by evaluating the car) will be used, but only the grep options from the first
   ;; expand elements with multiple files into multiple elements
   (setq fileregions (cl-loop for (files regions options prefixes) in fileregions
 			     if (stringp files) collect (list files regions options)
-			     else if (listp files)
-			     nconc (mapcar (lambda (file) (list file regions options)) files)
 			     else if (functionp files)
 			     nconc (let ((vals (funcall files)))
 				     (if (stringp vals)
 					 (list (list vals regions options))
 				       (mapcar (lambda (file) (list file regions options)) vals)))
+			     else if (listp files)
+			     nconc (mapcar (lambda (file) (list file regions options)) files)
 			     else do (error "Invalid file(s) argument: %s" files)))
   (let ((opts (caddar fileregions)))
     (grep (concat "grep --color -nH "
