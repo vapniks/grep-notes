@@ -17,7 +17,7 @@
 ;;
 ;; Features that might be required by this library:
 ;;
-;; cl-lib
+;; cl-lib man
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -106,6 +106,7 @@
 
 ;;; Require
 (require 'cl-lib)
+(require 'man)
 
 ;;; Code:
 
@@ -240,7 +241,12 @@ and POS is the position in the file to start searching from.
 If REGIONS is nil, all lines will be left unhidden."
   (with-current-buffer "*grep*"
     (let ((inhibit-read-only t)
-	  (rx (concat (regexp-quote (file-name-nondirectory file)) ":\\([0-9]+\\)"))
+	  (rx (concat (replace-regexp-in-string ;convert wildcards to regexp 
+		       "\\\\\\?" "."
+		       (replace-regexp-in-string
+			"\\\\\\*" ".*" (regexp-quote file) nil t)
+		       nil t)
+		      ":\\([0-9]+\\)"))
 	  (region (pop regions))
 	  (hidestart pos))
       (save-excursion
@@ -324,7 +330,8 @@ Note: all elements of `grep-notes-file-assoc' whose cars match current condition
 or by evaluating the car) will be used, but only the grep options from the first match will be used."
   (interactive (list (read-regexp "Find notes matching regexp"
 				  (if mark-active
-				      (buffer-substring-no-properties (region-beginning) (region-end))
+				      (buffer-substring-no-properties
+				       (region-beginning) (region-end))
 				    (thing-at-point 'symbol)))
 		     (if (and current-prefix-arg
 			      (listp current-prefix-arg))
@@ -392,21 +399,22 @@ or by evaluating the car) will be used, but only the grep options from the first
 	     for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
 				   regions) ;this needs to be outside `with-current-buffer'
 	     for existingbuf = (get-file-buffer file)
-	     do (with-current-buffer (find-file-noselect file t)
-		  (goto-char (point-min))
-		  (cl-loop for region in regions
-			   with prevregion = nil
-			   do (if (eq region 'grep-notes-repeat)
-				  (getargs prevregion
-					   (if (numberp start) (error "Invalid repeated region")
-					     (while (car newregions)
-					       (push (grep-notes-regexp-to-lines start end orgp t)
-						     newregions))))
-				(getargs region
-					 (push (grep-notes-regexp-to-lines start end orgp)
-					       newregions)))
-			   (setq prevregion region)))
-	     (unless existingbuf (kill-buffer (get-file-buffer file)))
+	     do (unless (not (file-exists-p file))
+		  (with-current-buffer (find-file-noselect file t)
+		    (goto-char (point-min))
+		    (cl-loop for region in regions
+			     with prevregion = nil
+			     do (if (eq region 'grep-notes-repeat)
+				    (getargs prevregion
+					     (if (numberp start) (error "Invalid repeated region")
+					       (while (car newregions)
+						 (push (grep-notes-regexp-to-lines start end orgp t)
+						       newregions))))
+				  (getargs region
+					   (push (grep-notes-regexp-to-lines start end orgp)
+						 newregions)))
+			     (setq prevregion region)))
+		  (unless existingbuf (kill-buffer (get-file-buffer file))))
 	     (setq pos (grep-notes-add-props-to-grep
 			file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
 					   (nreverse newregions))
