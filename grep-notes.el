@@ -403,6 +403,9 @@ or by evaluating the car) will be used, but only the grep options from the first
 		  (with-current-buffer (find-file-noselect file t)
 		    (save-excursion
 		      (goto-char (point-min))
+		      (if (or (eq major-mode 'org-mode)
+			      outline-minor-mode)
+			  (outline-show-all))
 		      (cl-loop for region in regions
 			       with prevregion = nil
 			       do (if (eq region 'grep-notes-repeat)
