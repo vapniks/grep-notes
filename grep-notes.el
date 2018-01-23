@@ -81,7 +81,7 @@
 ;;  `grep-notes-skip-missing-regions'
 ;;    If non-nil then if any regexp delimited region cannot be found it will be skipped.
 ;;    default = nil
-;;  `grep-note-more-manpages'
+;;  `grep-notes-more-manpages'
 ;;    If non-nil then `grep-notes-guess-manpages' will be less restrictive in its choice of manpages.
 ;;    default = t
 
@@ -144,7 +144,7 @@ forms:
  4) a function which takes the current major-mode as argument and returns one of the 
     aforementioned types. For example if the function is `symbol-name' then the associated
     regions will be org-headers named by the major-mode.
- 5) the symbol 'grep-note-repeat - this will repeat the previous org-header or regexp region 
+ 5) the symbol 'grep-notes-repeat - this will repeat the previous org-header or regexp region 
     specification until no more matches are possible.
 If REGIONS is empty then the whole file will be used.
 OPTIONS is an optional string containing extra options for grep.
@@ -205,7 +205,7 @@ Otherwise an error will be thrown (this can happen if you put the regions in the
   :type 'boolean)
 
 ;; simple-call-tree-info: DONE
-(defcustom grep-note-more-manpages t
+(defcustom grep-notes-more-manpages t
   "If non-nil then `grep-notes-guess-manpages' will be less restrictive in its choice of manpages."
   :group 'grep
   :type 'boolean)
@@ -455,7 +455,7 @@ manpage names to use, but if this returns nil then nil will be returned."
 (defun grep-notes-guess-manpages nil
   "Try to guess appropriate manpages for the current context."
   (let* ((rxsuffix (concat "\\(:?(.*)\\)?"
-			   (if grep-note-more-manpages "\\([^[:alpha:]]+.*\\)?")
+			   (if grep-notes-more-manpages "\\([^[:alpha:]]+.*\\)?")
 			   "$"))
 	 (parts (split-string buffer-file-name "/"))
 	 (etcparts (and parts (cl-member "^etc$" parts :test 'string-match)))
