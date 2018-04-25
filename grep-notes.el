@@ -241,7 +241,7 @@ and POS is the position in the file to start searching from.
 If REGIONS is nil, all lines will be left unhidden."
   (with-current-buffer "*grep*"
     (let ((inhibit-read-only t)
-	  (rx (concat (replace-regexp-in-string ;convert wildcards to regexp 
+	  (rx (concat (replace-regexp-in-string ;convert wildcards to regexp
 		       "\\\\\\?" "."
 		       (replace-regexp-in-string
 			"\\\\\\*" ".*" (regexp-quote file) nil t)
@@ -297,23 +297,21 @@ is non nil."
 				(message "Warning: can't find %s matching \"%s\", skipping.."
 					 type regex)
 			      (error "Cant find %s matching \"%s\"" type regex))
-			    nil))))	;must return nil if there is no match
+			    nil)))) ;must return nil if there is no match
     (let ((pos (re-search-forward (concat (if orgheaderp "^\\*+\s-*") startrx) nil t))
 	  startline endline)
       (if (not pos)
 	  (nomatch startrx)
 	(setq startline (line-number-at-pos pos))
 	(if orgheaderp
-	    (org-forward-heading-same-level 1)
+	    (progn (org-forward-heading-same-level 1 t)
+		   (unless (/= endline startline)
+		     (goto-char (point-max))))
 	  (if endrx
 	      (unless (re-search-forward endrx nil t)
 		(nomatch endrx))
 	    (goto-char (point-max))))
 	(setq endline (line-number-at-pos))
-	(if orgheaderp
-	    (unless (/= endline startline)
-	      (org-next-visible-heading 1)
-	      (setq endline (line-number-at-pos))))
 	(cons startline endline)))))
 
 ;;;###autoload
