@@ -443,13 +443,31 @@ manpage names to use, but if this returns nil then nil will be returned."
 		 for existingfile = (car (directory-files temporary-file-directory
 							  t (regexp-quote sanename)))
 		 for file = (or existingfile (make-temp-file sanename))
-		 do (unless existingfile
-		      (with-current-buffer (Man-getpage-in-background
-					    (Man-translate-references name))
-			(sleep-for 0.1)
-			(while (get-buffer-process (current-buffer))) ;wait for man to finish
-			(write-region nil nil file)))
+		 unless existingfile
+		 do (with-current-buffer (Man-getpage-in-background
+					  (Man-translate-references name))
+		      (sleep-for 0.1)
+		      (while (get-buffer-process (current-buffer))) ;wait for man to finish
+		      (write-region nil nil file))
 		 collect file))))
+
+(defun grep-notes-make-info-files (filenames)
+  "Return names of temporary files containing contents of info file in FILENAMES.
+FILENAMES can be the name of an info file, or a list of such names."
+  (info-initialize)
+  (if (stringp filenames) (setq filenames (list filenames)))
+  (let* ((filepaths (mapcar 'Info-find-file filenames)))
+    (cl-loop for path in filepaths
+	     for sanename = (concat (file-name-nondirectory path)
+				    "_grep-notes_infofile_")
+	     for existingfile = (car (directory-files temporary-file-directory
+						      t (regexp-quote sanename)))
+	     for file = (or existingfile (make-temp-file sanename))
+	     unless existingfile
+	     do (with-temp-buffer
+		  (insert-file path)
+		  (write-region nil nil file))
+	     collect file)))
 
 ;; simple-call-tree-info: CHECK  can this be improved?
 (defun grep-notes-guess-manpages nil
