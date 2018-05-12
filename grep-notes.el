@@ -451,6 +451,7 @@ manpage names to use, but if this returns nil then nil will be returned."
 		      (write-region nil nil file))
 		 collect file))))
 
+;; simple-call-tree-info: CHECK
 (defun grep-notes-make-info-files (filenames)
   "Return names of temporary files containing contents of info file in FILENAMES.
 FILENAMES can be the name of an info file, or a list of such names."
