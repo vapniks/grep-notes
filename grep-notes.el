@@ -153,7 +153,9 @@ PREFIXES is an optional list of positive integers indicating which numeric prefi
 this entry. If this list is nil (default) then this entry will always be tried. Otherwise it
 will only be tried when one of the numeric prefixes in the list is used. 
 If you assign higher prefix keys to entries that are slower to compute this allows you to
-use prefix keys to choose between a fast shallow search and a slow deep search for example."
+use prefix keys to choose between a fast shallow search and a slow deep search for example.
+Note: a value of 1 will match both a prefix of 1 and no prefix, since `prefix-numeric-value'
+is used to calculate the prefix value."
   :group 'grep
   :type '(alist :key-type (choice :tag "   Condition "
 				  (symbol :tag "Major-mode")
