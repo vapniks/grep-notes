@@ -401,22 +401,23 @@ or by evaluating the car) will be used, but only the grep options from the first
 	     do (unless (not (file-exists-p file))
 		  (with-current-buffer (find-file-noselect file t)
 		    (save-excursion
-		      (goto-char (point-min))
-		      (if (or (eq major-mode 'org-mode)
-			      outline-minor-mode)
-			  (outline-show-all))
-		      (cl-loop for region in regions
-			       with prevregion = nil
-			       do (if (eq region 'grep-notes-repeat)
-				      (getargs prevregion
-					       (if (numberp start) (error "Invalid repeated region")
-						 (while (car newregions)
-						   (push (grep-notes-regexp-to-lines start end orgp t)
-							 newregions))))
-				    (getargs region
-					     (push (grep-notes-regexp-to-lines start end orgp)
-						   newregions)))
-			       (setq prevregion region))))
+		      (org-save-outline-visibility nil
+			(goto-char (point-min))
+			(if (or (eq major-mode 'org-mode)
+				outline-minor-mode)
+			    (outline-show-all))
+			(cl-loop for region in regions
+				 with prevregion = nil
+				 do (if (eq region 'grep-notes-repeat)
+					(getargs prevregion
+						 (if (numberp start) (error "Invalid repeated region")
+						   (while (car newregions)
+						     (push (grep-notes-regexp-to-lines start end orgp t)
+							   newregions))))
+				      (getargs region
+					       (push (grep-notes-regexp-to-lines start end orgp)
+						     newregions)))
+				 (setq prevregion region)))))
 		  (unless existingbuf (kill-buffer (get-file-buffer file))))
 	     (setq pos (grep-notes-add-props-to-grep
 			file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
