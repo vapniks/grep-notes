@@ -286,7 +286,7 @@ If REGIONS is nil, all lines will be left unhidden."
 If ENDRX is nil then use the last line instead.
 If ORGHEADERP is non-nil then find org-header matching STARTRX, and return the start
 and end line numbers of that header and its contents.
-If STARTRX can't be found, either throw and error, or display a warning depending
+If STARTRX can't be found, either throw an error, or display a warning depending
 on the value of `grep-notes-skip-missing-regions'. If NOWARN is non-nil and STARTRX
 doesn't match then return nil with no error or warning even if `grep-notes-skip-missing-regions' 
 is non nil."
@@ -305,6 +305,7 @@ is non nil."
 	(setq startline (line-number-at-pos pos))
 	(if orgheaderp
 	    (progn (org-forward-heading-same-level 1 t)
+		   (setq endline (line-number-at-pos))
 		   (unless (/= endline startline)
 		     (goto-char (point-max))))
 	  (if endrx
