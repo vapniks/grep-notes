@@ -45,9 +45,9 @@
 ;; Bitcoin donations gratefully accepted: 1ArFina3Mi8UDghjarGqATeBgXRDWrsmzo
 ;;
 ;; The `grep-notes' command provides a quick & easy way to view notes associated
-;; with the current context. The `grep-notes-file-assoc' option is used to specify
-;; which file to use for grepping based on the current major-mode or some other
-;; condition.
+;; with the current context. Notes are specified in `grep-notes-alist', and 
+;; these notes are associated with the current context (major-mode or some other condition)
+;; in `grep-notes-assoc'.
 ;; 
 ;;;;;;;;
 
@@ -59,22 +59,21 @@
 ;;    Toggle which parts of the *grep* buffer are invisible.
 ;;    Keybinding: M-x grep-notes-toggle-invisibility
 ;;  `grep-notes'
-;;    Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
+;;    Grep for matches to REGEX within associated NOTES defined by `grep-notes-alist'.
 ;;    Keybinding: C-M-s-n
 ;;
 ;;; Customizable Options:
 ;;
 ;; Below is a list of customizable options:
 ;;
-;;  `grep-notes-default-file'
-;;    Default file to use for `grep-notes' command.
+;;  `grep-notes-alist'
+;;    Assoc list with entries of the form (NAME . (FILE REGIONS OPTIONS)) for use with `grep-notes'. 
+;;  `grep-notes-assoc'
+;;    Assoc list of the form (COND . NAME (PREFIXES)) for use with `grep-notes' command.
 ;;    default = nil
 ;;  `grep-notes-default-options'
-;;    Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
+;;    Extra options for grep searches when no extra options are given by the `grep-notes-alist' entry.
 ;;    default = "-i"
-;;  `grep-notes-file-assoc'
-;;    Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with `grep-notes' command.
-;;    default = nil
 ;;  `grep-notes-invisibility-spec'
 ;;    Indicate which parts of the *grep* buffer to hide by default.
 ;;    default = (quote (t other))
@@ -115,28 +114,42 @@
 ;;   2) Ability to quickly copy and paste parts of results strings (matched by another regexp?)
 
 ;; simple-call-tree-info: DONE
-(defcustom grep-notes-default-file nil
-  "Default file to use for `grep-notes' command.
-If nil then `grep-notes' will prompt for the file.
-If a directory then `grep-notes' will prompt for a file within that directory."
-  :group 'grep
-  :type 'file)
-
-;; simple-call-tree-info: DONE
 (defcustom grep-notes-default-options "-i"
   "Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
 Useful options could be -i (case-insensitive search), and -C <N> (include <N> lines of context)."
   :group 'grep
   :type 'string)
 
-;; simple-call-tree-info: DONE
-(defcustom grep-notes-file-assoc nil
-  "Assoc list of the form (COND . (FILE REGIONS OPTIONS PREFIXES)) for use with `grep-notes' command.
-COND can be either a major-mode symbol or an sexp which evaluates to non-nil
-in buffers of the required type. FILE is the file to be grepped, or a list of such files, 
-or a glob pattern for matching multiple files (but in this case REGIONS will not be respected), 
-or a function which returns any of those things (e.g. `grep-notes-make-manpage-files').
-REGIONS is a list of region specifications, each of which can take one of the following
+;; simple-call-tree-info: CHECK
+(defcustom grep-notes-assoc nil
+  "Assoc list of elements of the form (COND . NAME (PREFIXES)) for use with `grep-notes' command.
+COND can be either a major-mode symbol, or an sexp which evaluates to non-nil in buffers of the required type.
+PREFIXES is an optional list of numbers indicating numeric prefix arguments for selecting these notes (see below).
+NAME is a key for selecting notes from `grep-notes-alist'.
+
+If COND matches the current `major-mode' or evaluates to non-nil, then the notes in `grep-notes-alist' with
+key equal to NAME will be searched if either PREFIXES is nil (default), or it contains the current numeric
+prefix arg. Usually you will leave PREFIXES empty, but if you want more control over which notes to view, 
+e.g. for choosing between a fast shallow search or a slow deep search, then you may want to set it."
+  :group 'grep
+  :type '(repeat (list (choice :tag "Condition "
+			       (symbol :tag "Major-mode")
+			       (sexp :tag "S-expression"))
+		       (string :tag "Name/Description")
+		       (repeat :tag "Allowed numeric prefixes (leave empty to match all)"
+			       (integer :tag "Prefix")))))
+
+;; simple-call-tree-info: CHECK
+(defcustom grep-notes-alist nil
+  "Assoc list of note specification entries for use with `grep-notes'.
+Each entry can be in the form (NAME FILE REGIONS OPTIONS) or (NAME arbitrary FUNCTION ARGS).
+NAME should be a short description/label for the associated notes which will be offered to the user 
+when `grep-notes' is called with a prefix arg, or when there are no other notes associated with the 
+current buffer. 
+In the first form FILE is the file to be grepped, or a list of such files, or a glob pattern for 
+matching multiple files (but in this case REGIONS will not be respected), or a function of no args 
+which returns any of those things (e.g. `grep-notes-make-manpage-files').
+REGIONS is a list of region specifications, each of which can take one of the following 
 forms:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
  2) a cons cell of regexps matching the start and end of the region
@@ -146,39 +159,38 @@ forms:
     regions will be org-headers named by the major-mode.
  5) the symbol 'grep-notes-repeat - this will repeat the previous org-header or regexp region 
     specification until no more matches are possible.
-If REGIONS is empty then the whole file will be used.
+If REGIONS is empty then the whole file will be used. 
 OPTIONS is an optional string containing extra options for grep.
 
-PREFIXES is an optional list of positive integers indicating which numeric prefixes activate
-this entry. If this list is nil (default) then this entry will always be tried. Otherwise it
-will only be tried when one of the numeric prefixes in the list is used. 
-If you assign higher prefix keys to entries that are slower to compute this allows you to
-use prefix keys to choose between a fast shallow search and a slow deep search for example.
-Note: a value of 1 will match both a prefix of 1 and no prefix, since `prefix-numeric-value'
-is used to calculate the prefix value."
+Alternatively the second form (NAME arbitrary FUNCTION ARGS) can be used to call arbitrary functions
+ (e.g `helm-recoll' for desktop search). In this case FUNCTION can be any function, and ARGS is a list
+of arguments for that function. This second form is provided as a convenience so that you can use the 
+same user interface for all your document searching needs."
   :group 'grep
-  :type '(alist :key-type (choice :tag "   Condition "
-				  (symbol :tag "Major-mode")
-				  (sexp :tag "S-expression"))
-		:value-type (list (choice (file :must-match t)
-					  (repeat (file :must-match t))
-					  (function :tag "Function"
-						    :help-echo
-						    "Function with no arguments which returns a filename"))
-				  (repeat :tag "Search within following regions"
-					  (choice (string :tag "Org header")
-						  (cons :tag "Start/end regexps"
-							(regexp :tag "Start regexp")
-							(regexp :tag "End regexp  "))
-						  (cons :tag "Line numbers"
-							(integer :tag "Start line number")
-							(integer :tag "End line number  "))
-						  (function :tag "Function returning a region spec")
-						  (const :tag "Repeat last org-header or regexp spec until no more matches"
-							 grep-notes-repeat)))
-				  (string :tag "Extra grep options")
-				  (repeat :tag "Prefix keys restriction"
-					  (integer :tag "Prefix")))))
+  :type '(alist :key-type (string :tag "Name/Description")
+		:value-type (choice
+			     (list :tag "File(s)"
+				   (choice (file :must-match t)
+					   (repeat (file :must-match t))
+					   (function :tag "Function"
+						     :help-echo
+						     "Function with no arguments which returns a filename"))
+				   (repeat :tag "Search within following regions"
+					   (choice (string :tag "Org header")
+						   (cons :tag "Start/end regexps"
+							 (regexp :tag "Start regexp")
+							 (regexp :tag "End regexp  "))
+						   (cons :tag "Line numbers"
+							 (integer :tag "Start line number")
+							 (integer :tag "End line number  "))
+						   (function :tag "Function returning a region spec")
+						   (const :tag "Repeat last org-header or regexp spec until no more matches"
+							  grep-notes-repeat)))
+				   (string :tag "Extra grep options"))
+			     (list :tag "Function"
+				   (const arbitrary)
+				   (function :tag "Function")
+				   (repeat :tag "Args" (sexp :tag "Arg"))))))
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -230,9 +242,9 @@ Toggles `buffer-invisibility-spec' between the car and cdr of `grep-notes-invisi
   "Add inivisble 'path & 'linum props to current line in *grep* buffer.
 POS is position of end of line number, OFFSET is length of line number."
   (add-text-properties (line-beginning-position)
-		       (- pos (length offset))
+		       (- pos offset)
 		       '(invisible path))
-  (add-text-properties (- pos (length offset)) (1+ pos)
+  (add-text-properties (- pos offset) (1+ pos)
 		       '(invisible linum)))
 
 ;; simple-call-tree-info: DONE
@@ -243,7 +255,7 @@ and POS is the position in the file to start searching from.
 If REGIONS is nil, all lines will be left unhidden."
   (with-current-buffer "*grep*"
     (let ((inhibit-read-only t)
-	  (rx (concat (replace-regexp-in-string ;convert wildcards to regexp
+	  (rx (concat (replace-regexp-in-string ;convert wildcards to regexp in rx (matches filename in *grep* buffer)
 		       "\\\\\\?" "."
 		       (replace-regexp-in-string
 			"\\\\\\*" ".*" (regexp-quote file) nil t)
@@ -255,7 +267,7 @@ If REGIONS is nil, all lines will be left unhidden."
 	(goto-char pos)
 	(if (not region)
 	    (while (re-search-forward rx nil t)
-	      (grep-notes-propertize-line (point) (match-string 1))
+	      (grep-notes-propertize-line (point) (length (match-string 1)))
 	      (forward-line 1))
 	  (save-match-data
 	    (while (and region (re-search-forward rx nil t))
@@ -276,7 +288,7 @@ If REGIONS is nil, all lines will be left unhidden."
 			   (add-text-properties hidestart (line-beginning-position)
 						'(invisible other))
 			   (setq hidestart nil)) ;indicate that we are in a region
-			 (grep-notes-propertize-line (point) (match-string 1))
+			 (grep-notes-propertize-line (point) (length (match-string 1)))
 			 (forward-line 1)))))
 	    (if hidestart (add-text-properties hidestart
 					       (point) '(invisible other)))))
@@ -319,114 +331,121 @@ is non nil."
 
 ;;;###autoload
 ;; simple-call-tree-info: CHECK
-(defun grep-notes (regex &optional fileregions)
-  "Grep for matches to REGEX within associated FILEREGIONS defined by `grep-notes-file-assoc'.
+(defun grep-notes-get-notes (arg)
+  "Return a list of notes for the current buffer.
+If ARG is a non-nil list (e.g. the value of `current-prefix-arg' when C-u is pressed) 
+then the user will be prompted for a set of notes from `grep-notes-alist', otherwise
+the notes will be selected automatically using `grep-notes-assoc'. If no associated
+notes can be found using `grep-notes-assoc', but there is a member of `grep-notes-alist'
+with key \"default\", then that will be used."
+  (if (and arg (listp arg))
+      (list (assoc (completing-read "Notes to search: " (mapcar 'car grep-notes-alist))
+		   grep-notes-alist))
+    (or (cl-remove-if 'null
+		      (mapcar (lambda (val)
+				(let ((test (car val))
+				      (note (cdr val)))
+				  (and (if (symbolp test)
+					   (eq major-mode test)
+					 (eval test))
+				       (or (null (cl-second note))
+					   (memq (prefix-numeric-value arg)
+						 (cl-second note)))
+				       (assoc (car note) grep-notes-alist))))
+			      grep-notes-assoc))
+	(list (assoc "default" grep-notes-alist)))))
 
-When called interactively REGEX will be prompted for and FILEREGIONS will be obtained 
-from `grep-notes-file-assoc' or `grep-notes-default-file' if there are none. 
-If called with a non-numeric prefix arg, then a file and grep options will be prompted for, 
-and all of that file will be searched.
+;;;###autoload
+;; simple-call-tree-info: CHECK
+(defun grep-notes (notes regex)
+  "Grep for matches to REGEX within associated NOTES defined by `grep-notes-alist'.
 
-Note: all elements of `grep-notes-file-assoc' whose cars match current conditions (either by major-mode,
-or by evaluating the car) will be used, but only the grep options from the first match will be used."
-  (interactive (list (read-regexp "Find notes matching regexp"
-				  (if mark-active
-				      (buffer-substring-no-properties
-				       (region-beginning) (region-end))
-				    (thing-at-point 'symbol)))
-		     (if (and current-prefix-arg
-			      (listp current-prefix-arg))
-			 (list (list (read-file-name "File to grep: "
-						     (and grep-notes-default-file
-							  (file-directory-p grep-notes-default-file)
-							  grep-notes-default-file)
-						     nil t)
-				     nil (read-string "Extra options for grep: ")))
-		       (or (cl-remove-if 'null
-					 (mapcar (lambda (val)
-						   (let ((test (car val)))
-						     (and (if (symbolp test)
-							      (eq major-mode test)
-							    (eval test))
-							  (or (null (cl-fourth (cdr val)))
-							      (memq (prefix-numeric-value current-prefix-arg)
-								    (cl-fourth (cdr val))))
-							  (cdr val))))
-						 grep-notes-file-assoc))
-			   (list (list (if grep-notes-default-file
-					   (if (file-readable-p grep-notes-default-file)
-					       (if (file-directory-p grep-notes-default-file)
-						   (read-file-name
-						    "File to grep: " grep-notes-default-file nil t)
-						 grep-notes-default-file)
-					     (error "Cannot read file: %s" grep-notes-default-file))
-					 (read-file-name "File to grep: " nil nil t))
-				       nil nil))))))
-  ;; expand elements with multiple files into multiple elements
-  (setq fileregions (cl-loop for (files regions options prefixes) in fileregions
-			     if (stringp files) collect (list files regions options)
-			     else if (functionp files)
-			     nconc (let ((vals (funcall files)))
-				     (if (stringp vals)
-					 (list (list vals regions options))
-				       (mapcar (lambda (file) (list file regions options)) vals)))
-			     else if (listp files)
-			     nconc (mapcar (lambda (file) (list file regions options)) files)
-			     else do (error "Invalid file(s) argument: %s" files)))
-  (let ((opts (caddar fileregions)))
-    (grep (concat "grep --color -nH "
-		  (if (or (null opts)
-			  (equal opts ""))
-		      grep-notes-default-options
-		    opts)
-		  " -e '" regex "' "
-		  (mapconcat (lambda (x) (expand-file-name (car x))) fileregions " "))))
-  ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
-  (macrolet ((getargs (region body)
-		      `(destructuring-bind (start end orgp)
-			   (cond ((stringp ,region)
-				  (list ,region nil t))
-				 ((and (consp ,region)
-				       (or (stringp (car ,region))
-					   (and (numberp (car ,region))
-						(numberp (cdr ,region)))))
-				  (list (car ,region) (cdr ,region) nil))
-				 (t (error "Invalid region %s" ,region)))
-			 ,body)))
-    (while (get-buffer-process "*grep*") (sleep-for 0.3))
-    (cl-loop for (file regions options) in fileregions
-	     with pos = 1
-	     for newregions = nil
-	     for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
-				   regions) ;this needs to be outside `with-current-buffer'
-	     for existingbuf = (get-file-buffer file)
-	     do (unless (not (file-exists-p file))
-		  (with-current-buffer (find-file-noselect file t)
-		    (save-excursion
-		      (org-save-outline-visibility nil
-			(goto-char (point-min))
-			(if (or (eq major-mode 'org-mode)
-				outline-minor-mode)
-			    (outline-show-all))
-			(cl-loop for region in regions
-				 with prevregion = nil
-				 do (if (eq region 'grep-notes-repeat)
-					(getargs prevregion
-						 (if (numberp start) (error "Invalid repeated region")
-						   (while (car newregions)
-						     (push (grep-notes-regexp-to-lines start end orgp t)
-							   newregions))))
-				      (getargs region
-					       (push (grep-notes-regexp-to-lines start end orgp)
-						     newregions)))
-				 (setq prevregion region)))))
-		  (unless existingbuf (kill-buffer (get-file-buffer file))))
-	     (setq pos (grep-notes-add-props-to-grep
-			file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
-					   (nreverse newregions))
-			pos))))
-  (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
-  (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))
+When called interactively REGEX will be prompted for and NOTES will be obtained from `grep-notes-alist'. 
+These NOTES are selected automatically using `grep-notes-assoc', unless a non-numeric prefix arg is used
+or no matching notes can be found, in which case the user will be prompted for a set of notes in `grep-notes-alist'.
+
+Note: only grep options from the first matching set of notes will be used."
+  (interactive (let* ((notes (grep-notes-get-notes current-prefix-arg))
+		      (regex (when (not (eq (cl-second (car notes)) 'arbitrary))
+			       (read-regexp (cl-format
+					     nil "Find notes in~{ ~s,~} matching regexp"
+					     (mapcar 'car notes))
+					    (if mark-active
+						(buffer-substring-no-properties
+						 (region-beginning) (region-end))
+					      (thing-at-point 'symbol))))))
+		 (list notes regex)))
+  (let* ((notes (mapcar 'cdr notes))
+	 (firstnote (car notes)))
+    (if (eq (car firstnote) 'arbitrary)
+	(if (null (caddr firstnote))
+	    (funcall (cadr firstnote))
+	  (apply (cadr firstnote) (cddr firstnote)))
+      ;; expand elements with multiple files into multiple elements
+      (setq notes (cl-loop for (files regions options) in notes
+			   if (stringp files) collect (list files regions options)
+			   else if (functionp files)
+			   nconc (let ((vals (funcall files)))
+				   (if (stringp vals)
+				       (list (list vals regions options))
+				     (mapcar (lambda (file) (list file regions options)) vals)))
+			   else if (listp files)
+			   nconc (mapcar (lambda (file) (list file regions options)) files)
+			   else do (error "Invalid file(s) argument: %s" files)))
+      (let ((opts (caddar notes)))
+	(grep (concat "grep --color -nH "
+		      (if (or (null opts)
+			      (equal opts ""))
+			  grep-notes-default-options
+			opts)
+		      " -e '" regex "' "
+		      (mapconcat (lambda (x) (expand-file-name (car x))) notes " "))))
+      ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
+      (macrolet ((getargs (region body)
+			  `(destructuring-bind (start end orgp)
+			       (cond ((stringp ,region)
+				      (list ,region nil t))
+				     ((and (consp ,region)
+					   (or (stringp (car ,region))
+					       (and (numberp (car ,region))
+						    (numberp (cdr ,region)))))
+				      (list (car ,region) (cdr ,region) nil))
+				     (t (error "Invalid region %s" ,region)))
+			     ,body)))
+	(while (get-buffer-process "*grep*") (sleep-for 0.3))
+	(cl-loop for (file regions options) in notes
+		 with pos = 1
+		 for newregions = nil
+		 for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
+				       regions) ;this needs to be outside `with-current-buffer'
+		 for existingbuf = (get-file-buffer file)
+		 do (unless (not (file-exists-p file))
+		      (with-current-buffer (find-file-noselect file t)
+			(save-excursion
+			  (org-save-outline-visibility nil
+			    (goto-char (point-min))
+			    (if (or (eq major-mode 'org-mode)
+				    outline-minor-mode)
+				(outline-show-all))
+			    (cl-loop for region in regions
+				     with prevregion = nil
+				     do (if (eq region 'grep-notes-repeat)
+					    (getargs prevregion
+						     (if (numberp start) (error "Invalid repeated region")
+						       (while (car newregions)
+							 (push (grep-notes-regexp-to-lines start end orgp t)
+							       newregions))))
+					  (getargs region
+						   (push (grep-notes-regexp-to-lines start end orgp)
+							 newregions)))
+				     (setq prevregion region)))))
+		      (unless existingbuf (kill-buffer (get-file-buffer file))))
+		 (setq pos (grep-notes-add-props-to-grep
+			    file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
+					       (nreverse newregions))
+			    pos))))
+      (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
+      (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))))
 
 ;; simple-call-tree-info: CHECK
 (defun grep-notes-make-manpage-files (&optional names)

@@ -1,8 +1,8 @@
 * Description
-The *grep-notes* command provides a quick & easy way to view notes associated
-with the current context. The *grep-notes-file-assoc* option is used to specify
-which file to use for grepping based on the current major-mode or some other
-condition.
+The `grep-notes' command provides a quick & easy way to view notes associated
+with the current context. Notes are specified in `grep-notes-alist', and 
+these notes are associated with the current context (major-mode or some other condition)
+in `grep-notes-assoc'.
 * Installation
 
  - Put the library in a directory in the emacs load path, like ~/.emacs.d
@@ -26,13 +26,13 @@ condition.
 
  Below is a list of customizable options:
 
-   - *grep-notes-default-file* :
-    Default file to use for  - *grep-notes* : command when there is no file associated with the current buffer in *grep-notes-file-assoc*
-   - *grep-notes-file-assoc*
-    Assoc list of the form (COND . (FILE REGIONS OPTIONS)) for use with *grep-notes* command.
+   - *grep-notes-alist*
+    Assoc list with entries of the form (NAME . (FILE REGIONS OPTIONS)) for use with `grep-notes'. 
+   - *grep-notes-assoc*
+    Assoc list of the form (COND . NAME (PREFIXES)) for use with `grep-notes' command.
     default = nil
    - *grep-notes-default-options*
-    Extra options for grep searches when no extra options are given by *grep-notes-file-assoc* entry.
+    Extra options for grep searches when no extra options are given by *grep-notes-assoc* entry.
     default = "-i"
    - *grep-notes-invisibility-spec*
     Indicate which parts of the *grep* buffer to hide by default.
