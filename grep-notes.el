@@ -130,7 +130,10 @@ NAME is a key for selecting notes from `grep-notes-alist'.
 If COND matches the current `major-mode' or evaluates to non-nil, then the notes in `grep-notes-alist' with
 key equal to NAME will be searched if either PREFIXES is nil (default), or it contains the current numeric
 prefix arg. Usually you will leave PREFIXES empty, but if you want more control over which notes to view, 
-e.g. for choosing between a fast shallow search or a slow deep search, then you may want to set it."
+e.g. for choosing between a fast shallow search or a slow deep search, then you may want to set it.
+
+Note: you can have several different elements matching the same context, but only if the corresponding entries
+in `grep-notes-alist' are all grep entries, and not arbitrary function entries."
   :group 'grep
   :type '(repeat (list (choice :tag "Condition "
 			       (symbol :tag "Major-mode")
@@ -165,7 +168,10 @@ OPTIONS is an optional string containing extra options for grep.
 Alternatively the second form (NAME arbitrary FUNCTION ARGS) can be used to call arbitrary functions
  (e.g `helm-recoll' for desktop search). In this case FUNCTION can be any function, and ARGS is a list
 of arguments for that function. This second form is provided as a convenience so that you can use the 
-same user interface for all your document searching needs."
+same user interface for all your document searching needs. Note that these type of entries cannot be 
+used together with the other type, i.e. when `grep-notes' tries to find notes matching the current
+context using `grep-notes-assoc', if the first matching entry is one of these function entries then all 
+others will be ignored."
   :group 'grep
   :type '(alist :key-type (string :tag "Name/Description")
 		:value-type (choice
