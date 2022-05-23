@@ -373,8 +373,8 @@ or no matching notes can be found, in which case the user will be prompted for a
 Note: only grep options from the first matching set of notes will be used."
   (interactive (let* ((notes (grep-notes-get-notes current-prefix-arg))
 		      (regex (when (not (eq (cl-second (car notes)) 'arbitrary))
-			       (read-regexp (cl-format
-					     nil "Find notes in~{ ~s,~} matching regexp"
+			       (read-regexp (format
+					     "Find notes in %S matching regexp"
 					     (mapcar 'car notes))
 					    (if mark-active
 						(buffer-substring-no-properties
