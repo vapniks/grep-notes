@@ -115,8 +115,17 @@
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-default-options "-i"
-  "Extra options for grep searches when no extra options are given by `grep-notes-file-assoc' entry.
+  "Extra options for grep searches when no extra options are given by `grep-notes-alist' entry.
 Useful options could be -i (case-insensitive search), and -C <N> (include <N> lines of context)."
+  :group 'grep
+  :type 'string)
+
+(defcustom grep-notes-default-pdf-options "-nHi"
+  "Extra options for pdfgrep searches when no extra options are given by `grep-notes-alist' entry.
+You probably should include -n (show page-number) & -H (show filename) to enable jumping to the
+correct location in the pdf file from the *pdfgrep* buffer. You might also want to include -i
+ (case-insensitive search), -C <N> (include <N> lines of context), and -r (recursive search in
+directory arguments)."
   :group 'grep
   :type 'string)
 
@@ -145,15 +154,20 @@ in `grep-notes-alist' are all grep entries, and not arbitrary function entries."
 ;; simple-call-tree-info: CHECK
 (defcustom grep-notes-alist nil
   "Assoc list of note specification entries for use with `grep-notes'.
-Each entry can be in the form (NAME FILE REGIONS OPTIONS) or (NAME arbitrary FUNCTION ARGS).
+Each entry can be a list of the form (NAME FILES REGIONS OPTIONS) or (NAME pdfgrep FILES OPTIONS),
+or (NAME arbitrary FUNCTION ARGS), where pdfgrep & arbitrary are symbols indicating the search type.
+The first form is used for grep searches, the 2nd for pdfgrep searches, and the third for arbitrary
+functions (such as `helm-recoll').
+
 NAME should be a short description/label for the associated notes which will be offered to the user 
 when `grep-notes' is called with a prefix arg, or when there are no other notes associated with the 
 current buffer. 
-In the first form FILE is the file to be grepped, or a list of such files, or a glob pattern for 
-matching multiple files (but in this case REGIONS will not be respected), or a function of no args 
+
+FILES is the file to be grepped, or a list of such files, or a glob pattern for matching multiple 
+files (but in this case REGIONS will not be respected), or in the 1st form only, a function of no args 
 which returns any of those things (e.g. `grep-notes-make-manpage-files').
-REGIONS is a list of region specifications, each of which can take one of the following 
-forms:
+
+In the first form, REGIONS is a list of region specifications, each of which can be either:
  1) a regexp matching an org header (without initial stars or whitespace, can include tags)
  2) a cons cell of regexps matching the start and end of the region
  3) a cons cell of start and end line numbers for the region
@@ -163,19 +177,20 @@ forms:
  5) the symbol 'grep-notes-repeat - this will repeat the previous org-header or regexp region 
     specification until no more matches are possible.
 If REGIONS is empty then the whole file will be used. 
-OPTIONS is an optional string containing extra options for grep.
 
-Alternatively the second form (NAME arbitrary FUNCTION ARGS) can be used to call arbitrary functions
- (e.g `pdfgrep', or `helm-recoll'). In this case FUNCTION can be any function, and ARGS is a list of 
-arguments for that function. This second form is provided as a convenience so that you can use the same 
-user interface for all your document searching needs. Note that these type of entries cannot be used 
-together with the other type, i.e. when `grep-notes' tries to find notes matching the current context 
-using `grep-notes-assoc', if the first matching entry is one of these function entries then all others 
-will be ignored."
+OPTIONS is an optional string containing extra options for grep/pdfgrep.
+
+In the third form (NAME arbitrary FUNCTION ARGS) FUNCTION can be any function, and ARGS is a list of 
+arguments for that function. This 3rd form is provided as a convenience so that you can use the same 
+user interface for all your document searching needs. 
+
+NOTE: you cannot mix different type of entries, i.e. when `grep-notes' tries to find notes matching 
+the current context using `grep-notes-assoc', if the first matching entry is of type 'pdfgrep or 'arbitrary
+then any other matching entries will be ignored."
   :group 'grep
   :type '(alist :key-type (string :tag "Name/Description")
 		:value-type (choice
-			     (list :tag "File(s)"
+			     (list :tag "grep file(s)"
 				   (choice (file :must-match t)
 					   (repeat (file :must-match t))
 					   (function :tag "Function"
@@ -193,7 +208,12 @@ will be ignored."
 						   (const :tag "Repeat last org-header or regexp spec until no more matches"
 							  grep-notes-repeat)))
 				   (string :tag "Extra grep options"))
-			     (list :tag "Function"
+			     (list :tag "pdfgrep pdf file(s)"
+				   (const pdfgrep)
+				   (choice (file :must-match t)
+					   (repeat (file :must-match t)))
+				   (string :tag "pdfgrep options"))
+			     (list :tag "Arbitrary function"
 				   (const arbitrary)
 				   (function :tag "Function")
 				   (repeat :tag "Args" (sexp :tag "Arg"))))))
@@ -383,75 +403,89 @@ Note: only grep options from the first matching set of notes will be used."
 		 (list notes regex)))
   (let* ((notes (mapcar 'cdr notes))
 	 (firstnote (car notes)))
-    (if (eq (car firstnote) 'arbitrary)
-	(if (null (caddr firstnote))
-	    (funcall (cadr firstnote))
-	  (apply (cadr firstnote) (cddr firstnote)))
-      ;; expand elements with multiple files into multiple elements
-      (setq notes (cl-loop for (files regions options) in notes
-			   if (stringp files) collect (list files regions options)
-			   else if (functionp files)
-			   nconc (let ((vals (funcall files)))
-				   (if (stringp vals)
-				       (list (list vals regions options))
-				     (mapcar (lambda (file) (list file regions options)) vals)))
-			   else if (listp files)
-			   nconc (mapcar (lambda (file) (list file regions options)) files)
-			   else do (error "Invalid file(s) argument: %s" files)))
-      (let ((opts (caddar notes)))
-	(grep (concat "grep --color -nH "
-		      (if (or (null opts)
-			      (equal opts ""))
-			  grep-notes-default-options
-			opts)
-		      " -e '" regex "' "
-		      (mapconcat (lambda (x) (expand-file-name (car x))) notes " "))))
-      ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, and orgp for use in body
-      (macrolet ((getargs (region body)
-			  `(destructuring-bind (start end orgp)
-			       (cond ((stringp ,region)
-				      (list ,region nil t))
-				     ((and (consp ,region)
-					   (or (stringp (car ,region))
-					       (and (numberp (car ,region))
-						    (numberp (cdr ,region)))))
-				      (list (car ,region) (cdr ,region) nil))
-				     (t (error "Invalid region %s" ,region)))
-			     ,body)))
-	(while (get-buffer-process "*grep*") (sleep-for 0.3))
-	(cl-loop for (file regions options) in notes
-		 with pos = 1
-		 for newregions = nil
-		 for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
-				       regions) ;this needs to be outside `with-current-buffer'
-		 for existingbuf = (get-file-buffer file)
-		 do (unless (not (file-exists-p file))
-		      (with-current-buffer (find-file-noselect file t)
-			(save-excursion
-			  (org-save-outline-visibility nil
-			    (goto-char (point-min))
-			    (if (or (eq major-mode 'org-mode)
-				    outline-minor-mode)
-				(outline-show-all))
-			    (cl-loop for region in regions
-				     with prevregion = nil
-				     do (if (eq region 'grep-notes-repeat)
-					    (getargs prevregion
-						     (if (numberp start) (error "Invalid repeated region")
-						       (while (car newregions)
-							 (push (grep-notes-regexp-to-lines start end orgp t)
-							       newregions))))
-					  (getargs region
-						   (push (grep-notes-regexp-to-lines start end orgp)
-							 newregions)))
-				     (setq prevregion region)))))
-		      (unless existingbuf (kill-buffer (get-file-buffer file))))
-		 (setq pos (grep-notes-add-props-to-grep
-			    file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
-					       (nreverse newregions))
-			    pos))))
-      (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
-      (setq buffer-invisibility-spec (car grep-notes-invisibility-spec)))))
+    (cl-case (car firstnote)
+      (arbitrary (if (null (caddr firstnote))
+		     (funcall (cadr firstnote))
+		   (apply (cadr firstnote) (cddr firstnote))))
+      (pdfgrep (let ((files (cadr firstnote))
+		     (opts (caddr firstnote)))
+		 (pdfgrep-mode)
+		 (pdfgrep (concat "pdfgrep "
+				  (if (or (null opts)
+					  (equal opts ""))
+				      grep-notes-default-pdf-options
+				    opts)
+				  " \"" regex "\" "
+				  (if (listp files)
+				      (mapconcat 'identity files " ")
+				    files)))))
+      (t
+       ;; expand elements with multiple files into multiple elements
+       (setq notes (cl-loop for (files regions options) in notes
+			    if (stringp files) collect (list files regions options)
+			    else if (functionp files)
+			    nconc (let ((vals (funcall files)))
+				    (if (stringp vals)
+					(list (list vals regions options))
+				      (mapcar (lambda (file) (list file regions options)) vals)))
+			    else if (listp files)
+			    nconc (mapcar (lambda (file) (list file regions options)) files)
+			    else do (error "Invalid file(s) argument: %s" files)))
+       (let ((opts (caddar notes)))
+	 (grep (concat "grep --color -nH "
+		       (if (or (null opts)
+			       (equal opts ""))
+			   grep-notes-default-options
+			 opts)
+		       " -e '" regex "' "
+		       (mapconcat (lambda (x) (expand-file-name (car x))) notes " "))))
+       ;; macro gets args for `grep-notes-regexp-to-lines' from region and puts in start, end, 
+       ;; and orgp for use in body
+       (macrolet ((getargs (region body)
+			   `(destructuring-bind (start end orgp)
+				(cond ((stringp ,region)
+				       (list ,region nil t))
+				      ((and (consp ,region)
+					    (or (stringp (car ,region))
+						(and (numberp (car ,region))
+						     (numberp (cdr ,region)))))
+				       (list (car ,region) (cdr ,region) nil))
+				      (t (error "Invalid region %s" ,region)))
+			      ,body)))
+	 (while (get-buffer-process "*grep*") (sleep-for 0.3))
+	 (cl-loop for (file regions options) in notes
+		  with pos = 1
+		  for newregions = nil
+		  for regions = (mapcar (lambda (r) (if (functionp r) (funcall r major-mode) r))
+					regions) ;this needs to be outside `with-current-buffer'
+		  for existingbuf = (get-file-buffer file)
+		  do (unless (not (file-exists-p file))
+		       (with-current-buffer (find-file-noselect file t)
+			 (save-excursion
+			   (org-save-outline-visibility nil
+			     (goto-char (point-min))
+			     (if (or (eq major-mode 'org-mode)
+				     outline-minor-mode)
+				 (outline-show-all))
+			     (cl-loop for region in regions
+				      with prevregion = nil
+				      do (if (eq region 'grep-notes-repeat)
+					     (getargs prevregion
+						      (if (numberp start) (error "Invalid repeated region")
+							(while (car newregions)
+							  (push (grep-notes-regexp-to-lines start end orgp t)
+								newregions))))
+					   (getargs region
+						    (push (grep-notes-regexp-to-lines start end orgp)
+							  newregions)))
+				      (setq prevregion region)))))
+		       (unless existingbuf (kill-buffer (get-file-buffer file))))
+		  (setq pos (grep-notes-add-props-to-grep
+			     file (cl-remove-if (lambda (r) (or (null r) (null (car r))))
+						(nreverse newregions))
+			     pos))))
+       (with-current-buffer "*grep*" (local-set-key "t" 'grep-notes-toggle-invisibility))
+       (setq buffer-invisibility-spec (car grep-notes-invisibility-spec))))))
 
 ;; simple-call-tree-info: CHECK
 (defun grep-notes-make-manpage-files (&optional names)
