@@ -166,12 +166,12 @@ If REGIONS is empty then the whole file will be used.
 OPTIONS is an optional string containing extra options for grep.
 
 Alternatively the second form (NAME arbitrary FUNCTION ARGS) can be used to call arbitrary functions
- (e.g `helm-recoll' for desktop search). In this case FUNCTION can be any function, and ARGS is a list
-of arguments for that function. This second form is provided as a convenience so that you can use the 
-same user interface for all your document searching needs. Note that these type of entries cannot be 
-used together with the other type, i.e. when `grep-notes' tries to find notes matching the current
-context using `grep-notes-assoc', if the first matching entry is one of these function entries then all 
-others will be ignored."
+ (e.g `pdfgrep', or `helm-recoll'). In this case FUNCTION can be any function, and ARGS is a list of 
+arguments for that function. This second form is provided as a convenience so that you can use the same 
+user interface for all your document searching needs. Note that these type of entries cannot be used 
+together with the other type, i.e. when `grep-notes' tries to find notes matching the current context 
+using `grep-notes-assoc', if the first matching entry is one of these function entries then all others 
+will be ignored."
   :group 'grep
   :type '(alist :key-type (string :tag "Name/Description")
 		:value-type (choice
