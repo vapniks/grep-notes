@@ -124,8 +124,8 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
   "Extra options for pdfgrep searches when no extra options are given by `grep-notes-alist' entry.
 You probably should include -n (show page-number) & -H (show filename) to enable jumping to the
 correct location in the pdf file from the *pdfgrep* buffer. You might also want to include -i
- (case-insensitive search), -C <N> (include <N> lines of context), and -r (recursive search in
-directory arguments)."
+ (case-insensitive search), -C <N> (include <N> lines of context), -r (recursive search in
+directory arguments), and --cache (cache rendered files)."
   :group 'grep
   :type 'string)
 
