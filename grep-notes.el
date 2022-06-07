@@ -142,6 +142,36 @@ in `grep-notes-alist' are all grep entries, and not arbitrary function entries."
 		       (repeat :tag "Allowed numeric prefixes (leave empty to match all)"
 			       (integer :tag "Prefix")))))
 
+(defvar grep-notes-default-alist
+  '(("pdfgrep"
+     arbitrary pdfgrep
+     ((eval . (let* ((files (file-expand-wildcards
+			     (replace-regexp-in-string
+			      "/$" "" (ido-read-file-name
+				       "PDF files/dir (you can use wildcards): "))))
+		     (pat (read-string "Pattern to search for: "))
+		     (args (read-string
+			    "Args for pdfgrep: "
+			    (concat pdfgrep-options " "
+				    (when pdfgrep-ignore-case "-i ")
+				    (when (cl-some 'file-directory-p files) "-r ")))))
+		(concat "pdfgrep " args " " pat " "
+			(mapconcat 'identity files " "))))))
+    ("grep"
+     arbitrary grep
+     ((eval . (let* ((files (file-expand-wildcards
+			     (replace-regexp-in-string
+			      "/$" "" (ido-read-file-name
+				       "Text files/dir (you can use wildcards): "))))
+		     (pat (read-string "Pattern to search for: "))
+		     (args (read-string
+			    "Extra args for grep (in addition to --color -nH): "
+			    (concat grep-notes-default-options " "
+				    (when (cl-some 'file-directory-p files) "-r ")))))
+		(concat "grep --color -nH " args "-e '" pat "' "
+			(mapconcat 'identity files " ")))))))
+  "Default values for `grep-notes-alist' that will always be offered to the user.")
+
 ;; simple-call-tree-info: CHECK
 (defcustom grep-notes-alist nil
   "Assoc list of note specification entries for use with `grep-notes'.
@@ -368,22 +398,23 @@ then the user will be prompted for a set of notes from `grep-notes-alist', other
 the notes will be selected automatically using `grep-notes-assoc'. If no associated
 notes can be found using `grep-notes-assoc', but there is a member of `grep-notes-alist'
 with key \"default\", then that will be used."
-  (if (and arg (listp arg))
-      (list (assoc (completing-read "Notes to search: " (mapcar 'car grep-notes-alist))
-		   grep-notes-alist))
-    (or (cl-remove-if 'null
-		      (mapcar (lambda (val)
-				(let ((test (car val))
-				      (note (cdr val)))
-				  (and (if (symbolp test)
-					   (eq major-mode test)
-					 (eval test))
-				       (or (null (cl-second note))
-					   (memq (prefix-numeric-value arg)
-						 (cl-second note)))
-				       (assoc (car note) grep-notes-alist))))
-			      grep-notes-assoc))
-	(list (assoc "default" grep-notes-alist)))))
+  (let ((allnotes (append grep-notes-alist grep-notes-default-alist)))
+    (if (and arg (listp arg))
+	(list (assoc (completing-read "Notes to search: " (mapcar 'car allnotes))
+		     allnotes))
+      (or (cl-remove-if 'null
+			(mapcar (lambda (val)
+				  (let ((test (car val))
+					(note (cdr val)))
+				    (and (if (symbolp test)
+					     (eq major-mode test)
+					   (eval test))
+					 (or (null (cl-second note))
+					     (memq (prefix-numeric-value arg)
+						   (cl-second note)))
+					 (assoc (car note) allnotes))))
+				grep-notes-assoc))
+	  (list (assoc "default" allnotes))))))
 
 ;;;###autoload
 ;; simple-call-tree-info: CHECK
@@ -427,7 +458,7 @@ Note: only grep options from the first matching set of notes will be used."
 				  (if (or (null opts)
 					  (equal opts ""))
 				      (concat pdfgrep-options
-					      (when pdfgrep-ignore-case "-i "))
+					      (when pdfgrep-ignore-case " -i "))
 				    opts)
 				  " \"" regex "\" "
 				  (if (listp files)
