@@ -120,15 +120,6 @@ Useful options could be -i (case-insensitive search), and -C <N> (include <N> li
   :group 'grep
   :type 'string)
 
-(defcustom grep-notes-default-pdf-options "-nHi"
-  "Extra options for pdfgrep searches when no extra options are given by `grep-notes-alist' entry.
-You probably should include -n (show page-number) & -H (show filename) to enable jumping to the
-correct location in the pdf file from the *pdfgrep* buffer. You might also want to include -i
- (case-insensitive search), -C <N> (include <N> lines of context), -r (recursive search in
-directory arguments), and --cache (cache rendered files)."
-  :group 'grep
-  :type 'string)
-
 ;; simple-call-tree-info: CHECK
 (defcustom grep-notes-assoc nil
   "Assoc list of elements of the form (COND . NAME (PREFIXES)) for use with `grep-notes' command.
@@ -435,7 +426,8 @@ Note: only grep options from the first matching set of notes will be used."
 		 (pdfgrep (concat "pdfgrep "
 				  (if (or (null opts)
 					  (equal opts ""))
-				      grep-notes-default-pdf-options
+				      (concat pdfgrep-options
+					      (when pdfgrep-ignore-case "-i "))
 				    opts)
 				  " \"" regex "\" "
 				  (if (listp files)
