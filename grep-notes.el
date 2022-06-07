@@ -155,9 +155,10 @@ in `grep-notes-alist' are all grep entries, and not arbitrary function entries."
 (defcustom grep-notes-alist nil
   "Assoc list of note specification entries for use with `grep-notes'.
 Each entry can be a list of the form (NAME FILES REGIONS OPTIONS) or (NAME pdfgrep FILES OPTIONS),
-or (NAME arbitrary FUNCTION ARGS), where pdfgrep & arbitrary are symbols indicating the search type.
-The first form is used for grep searches, the 2nd for pdfgrep searches, and the third for arbitrary
-functions (such as `helm-recoll').
+ (NAME arbitrary FUNCTION ARGS), or (NAME command CMD PREFIX), where pdfgrep, arbitrary & command 
+are symbols indicating the search type.
+The first form is used for grep searches, the 2nd for pdfgrep searches, and the third & fourth for 
+arbitrary functions & commands (such as `helm-recoll').
 
 NAME should be a short description/label for the associated notes which will be offered to the user 
 when `grep-notes' is called with a prefix arg, or when there are no other notes associated with the 
@@ -181,12 +182,16 @@ If REGIONS is empty then the whole file will be used.
 OPTIONS is an optional string containing extra options for grep/pdfgrep.
 
 In the third form (NAME arbitrary FUNCTION ARGS) FUNCTION can be any function, and ARGS is a list of 
-arguments for that function. This 3rd form is provided as a convenience so that you can use the same 
-user interface for all your document searching needs. 
+arguments for that function. The members of ARGS can either be values to be treated directly as 
+arguments to FUNCTION, or cons cells of the form (eval . ARG) where ARG is a form that will be
+evaluated before being passed to FUNCTION. This 3rd form is provided as a convenience so that you can 
+use the same user interface for all your document searching needs. 
+In the fourth form (NAME command CMD PREFIX) CMD can be any interactive command, and PREFIX is a value 
+to set `current-prefix-arg' before calling CMD with `call-interactively'.
 
 NOTE: you cannot mix different type of entries, i.e. when `grep-notes' tries to find notes matching 
-the current context using `grep-notes-assoc', if the first matching entry is of type 'pdfgrep or 'arbitrary
-then any other matching entries will be ignored."
+the current context using `grep-notes-assoc', if the first matching entry is of type 'pdfgrep, 'arbitrary
+or 'command then any other matching entries will be ignored."
   :group 'grep
   :type '(alist :key-type (string :tag "Name/Description")
 		:value-type (choice
@@ -216,7 +221,15 @@ then any other matching entries will be ignored."
 			     (list :tag "Arbitrary function"
 				   (const arbitrary)
 				   (function :tag "Function")
-				   (repeat :tag "Args" (sexp :tag "Arg"))))))
+				   (repeat :tag "Args" (choice (sexp :tag "Arg")
+							       (cons :tag "Evaled arg"
+								     (const eval)
+								     (sexp :tag "Arg"
+									   :help-echo "This arg will be evalled before being passed to the function")))))
+			     (list :tag "Interactive command"
+				   (const command)
+				   (function :tag "Command")
+				   (sexp :tag "Prefix arg")))))
 
 ;; simple-call-tree-info: DONE
 (defcustom grep-notes-invisibility-spec '(t . (other))
@@ -392,7 +405,7 @@ or no matching notes can be found, in which case the user will be prompted for a
 
 Note: only grep options from the first matching set of notes will be used."
   (interactive (let* ((notes (grep-notes-get-notes current-prefix-arg))
-		      (regex (when (not (eq (cl-second (car notes)) 'arbitrary))
+		      (regex (when (not (memq (cl-second (car notes)) '(arbitrary command)))
 			       (read-regexp (format
 					     "Find notes in %S matching regexp"
 					     (mapcar 'car notes))
@@ -406,7 +419,16 @@ Note: only grep options from the first matching set of notes will be used."
     (cl-case (car firstnote)
       (arbitrary (if (null (caddr firstnote))
 		     (funcall (cadr firstnote))
-		   (apply (cadr firstnote) (cddr firstnote))))
+		   (apply (cadr firstnote)
+			  (mapcar
+			   (lambda (x)
+			     (if (and (listp x)
+				      (eq (car x) 'eval))
+				 (eval (cdr x))
+			       x))
+			   (caddr firstnote)))))
+      (command (let ((current-prefix-arg (caddr firstnote)))
+		 (call-interactively (cadr firstnote))))
       (pdfgrep (let ((files (cadr firstnote))
 		     (opts (caddr firstnote)))
 		 (pdfgrep-mode)
